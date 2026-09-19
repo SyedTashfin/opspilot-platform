@@ -96,7 +96,7 @@ async def test_successful_run_records_every_step() -> None:
     assert summary.status is RunStatus.SUCCEEDED
     assert summary.steps_executed == 3
     assert calls == ["step-0", "step-1", "step-2"]
-    assert store.status_of(summary.run_id) is RunStatus.SUCCEEDED
+    assert await store.status_of(summary.run_id) is RunStatus.SUCCEEDED
     records = await store.steps(summary.run_id)
     assert [record.status for record in records] == [StepStatus.SUCCEEDED] * 3
     assert all(record.duration_ms is not None for record in records)

@@ -114,13 +114,16 @@ class ToolExecutor:
             output, failure = await self._invoke(definition, parsed, context)
             latency_ms = int((self.clock() - started) * 1000)
             # Set on the span before it closes: a finished span ignores further attributes.
-            set_attributes(
-                tool_span,
-                {
-                    "tool.status": failure[0].value if failure is not None else CallStatus.OK.value,
-                    "tool.latency_ms": latency_ms,
-                },
-            )
+            attributes = {
+                "tool.status": failure[0].value if failure is not None else CallStatus.OK.value,
+                "tool.latency_ms": latency_ms,
+            }
+            # Carry the data's provenance onto the span, so the platform overview can say out loud that
+            # its telemetry came from the incident lab rather than from live infrastructure.
+            source = getattr(output, "source", None)
+            if isinstance(source, str) and source:
+                attributes["source"] = source
+            set_attributes(tool_span, attributes)
             if failure is not None:
                 record_error(tool_span, failure[1], failure[0].value)
 

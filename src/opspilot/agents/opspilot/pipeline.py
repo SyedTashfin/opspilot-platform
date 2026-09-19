@@ -22,7 +22,7 @@ from typing import Any, Literal
 from pydantic import BaseModel
 
 from opspilot.agent.store import StepRecord
-from opspilot.agent.types import RunState, StepResult
+from opspilot.agent.types import AgentStep, RunState, StepResult
 from opspilot.agents.opspilot.guardrails import detect_injections, flag_texts
 from opspilot.agents.opspilot.prompts import classification_messages, diagnosis_messages
 from opspilot.agents.opspilot.schemas import (
@@ -457,7 +457,7 @@ def investigation_steps(
     gateway: ModelGateway,
     executor: ToolExecutor,
     runbooks: RunbookIndex,
-) -> list[Any]:
+) -> list[AgentStep]:
     """The OpsPilot pipeline, wired to the tools it is allowed to use."""
 
     def service(state: RunState) -> str:

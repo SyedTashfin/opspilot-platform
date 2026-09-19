@@ -301,13 +301,20 @@ def gateway_from_settings(
     providers: Sequence[ModelProvider],
     recorder: ModelCallRecorder,
     ledger: CostLedger,
+    *,
+    model: str | None = None,
 ) -> ModelGateway:
     """Build a gateway from application settings.
 
     Kept here rather than in ``config`` so configuration stays free of provider dependencies.
+
+    ``model`` overrides the primary model in the chain. It exists because a provider answers only for the
+    models it claims: asking the deterministic provider for the configured DeepSeek model is a wiring
+    error that surfaces as "no provider registered for this model" at the first call, which is a
+    confusing way to learn that the wrong model name was requested.
     """
     policy = ModelPolicy.from_settings(
-        default_model=settings.default_model,
+        default_model=model or settings.default_model,
         fallback_model=settings.fallback_model,
         overrides=settings.model_policy_overrides,
         extra_fallbacks=settings.extra_fallbacks,

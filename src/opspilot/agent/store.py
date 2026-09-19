@@ -74,6 +74,8 @@ class RunStore(Protocol):
         """Record which trace the run belongs to, so its spans can be found later."""
         ...
 
+    async def status_of(self, run_id: uuid.UUID) -> RunStatus: ...
+
     async def record_spans(self, *, run_id: uuid.UUID, spans: Sequence[SpanRecord]) -> None: ...
 
 
@@ -158,7 +160,7 @@ class InMemoryRunStore:
     async def record_spans(self, *, run_id: uuid.UUID, spans: Sequence[SpanRecord]) -> None:
         self.spans.setdefault(run_id, []).extend(spans)
 
-    def status_of(self, run_id: uuid.UUID) -> RunStatus:
+    async def status_of(self, run_id: uuid.UUID) -> RunStatus:
         return cast(RunStatus, self.runs[run_id]["status"])
 
 
@@ -282,6 +284,14 @@ class PostgresRunStore:
             self._session.add(Span(**record.as_row(run_id)))
         if spans:
             await self._session.flush()
+
+    async def status_of(self, run_id: uuid.UUID) -> RunStatus:
+        status = (
+            await self._session.execute(sa.select(Run.status).where(Run.id == run_id))
+        ).scalar_one_or_none()
+        if status is None:
+            raise UnknownAgentError(f"no run {run_id}")
+        return status if isinstance(status, RunStatus) else RunStatus(status)
 
 
 class AgentSeed(BaseModel):
