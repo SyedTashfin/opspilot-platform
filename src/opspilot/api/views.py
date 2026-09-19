@@ -251,8 +251,9 @@ trace <code>{_e((trace.get("trace_id") or "none")[:16])}</code> ·
 {step_html}
 {detail}
 <h2>API</h2>
-<p class='muted' style='font-size:13px'>GET <a href='/api/v1/runs/{_e(run_id)}'>/api/v1/runs/{_e(run_id[:8])}</a>
-· GET <a href='/api/v1/runs/{_e(run_id)}/trace'>/api/v1/runs/{_e(run_id[:8])}/trace</a> ·
-<a href='/api/v1/platform/overview'>overview</a></p>
+<p class='muted' style='font-size:13px'>
+<a href='/api/v1/runs/{_e(run_id)}'>/api/v1/runs/{_e(run_id[:8])}</a> ·
+<a href='/api/v1/runs/{_e(run_id)}/trace'>/api/v1/runs/{_e(run_id[:8])}/trace</a> ·
+<a href='/api/v1/platform/overview'>/api/v1/platform/overview</a> · <a href='/docs'>/docs</a></p>
 """
     return _page(f"Run {run_id[:8]}", body)
