@@ -1,20 +1,22 @@
 # Project state
 
-Last updated: 2026-09-19 (end of M5).
+Last updated: 2026-09-19 (end of M6).
 
 ## Current milestone
 
-**M0–M4 complete** (research and architecture, local skeleton, model gateway, tool registry and audit,
-agent runtime and OpsPilot pipeline) **and M5 (observability and platform metrics) complete.**
+**M0–M6 complete**: research and architecture, local skeleton, model gateway, tool registry and audit,
+agent runtime and OpsPilot pipeline, observability and platform metrics, and the Incident Lab.
 
 Verification, all run locally on 2026-09-19 against the real stack:
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Formatting | `uv run ruff format --check src tests migrations` | 85 files already formatted |
+| Formatting | `uv run ruff format --check src tests migrations` | 94 files already formatted |
 | Lint | `uv run ruff check src tests migrations` | all checks passed |
-| Types | `uv run mypy src` | no issues in 56 source files |
-| Tests | `uv run pytest` | **166 passed, 1 deselected** (live marker), 9 of them against live PostgreSQL |
+| Types | `uv run mypy src` | no issues in 62 source files |
+| Tests | `uv run pytest` | **192 passed, 1 deselected** (live marker), 12 of them against live PostgreSQL |
+| Incident Lab | `uv run pytest tests/lab -q` | 16 tests: fault injection really changes behaviour, and the answer key never reaches the read surface |
+| Compose | `docker compose config --quiet` | valid, including the lab service |
 | Migration (live) | `uv run alembic upgrade head` | `0003_spans` applied to PostgreSQL 16; `spans` table confirmed |
 | Trace read-back | `tests/integration/test_spans_and_metrics.py` | spans round-trip through PostgreSQL; the overview aggregates rows the test inserted and can count by hand |
 | Demo run | `uv run pytest tests/agents -q` | 11-step investigation on the deterministic provider, reproducible |
@@ -188,12 +190,37 @@ Full rationale and rejected alternatives: `docs/DECISIONS.md`.
 - Tests: 27 new (metric aggregation and provenance, span structure and non-leakage, the two endpoints),
   plus 3 integration tests against live PostgreSQL.
 
-## Active work
+### M6 — the Incident Lab (complete)
 
-M6 — the Incident Lab: a `demo-service` container with a control API that injects faults in process
-(latency, 5xx, resource exhaustion, dependency failure), scenarios whose ground truth is withheld from
-the agent, and an HTTP `TelemetrySource` that replaces the synthetic one without touching a pipeline
-step — which is the point of the tool factories built in M4.
+- `opspilot.lab` is a real service, not a fixture: `/work` really slows down or fails according to the
+  injected fault, and it records what it actually served. The telemetry an investigation reads is
+  computed from those observations.
+- **Two surfaces, deliberately separated.** The read surface (`/metrics`, `/logs`, `/deployments`,
+  `/state`) is what the agent's tools consume. The admin surface (`/admin/faults`, `/admin/ground-truth`,
+  `/admin/restart`) requires a token, and **no agent tool points at it** — a test walks the tool registry
+  and asserts no governance payload mentions `/admin` or the ground truth (ADR-021).
+- **Ground truth is withheld at the source.** A scenario carries the fault *and* the answer key: root
+  cause, acceptable diagnoses, expected tools, forbidden actions. The scenario's `alert()` exposes only
+  the symptom, and an injection is not written to the service log stream — a production service does not
+  print "a fault was injected", and an agent reading logs must not be handed the answer.
+- Three scenarios shipped: a deployment that causes retry amplification against a slow dependency, a
+  dependency outage producing fast 503s, and CPU saturation. Each lists what a correct investigation must
+  not do (for example: restart the service without evidence).
+- `HttpTelemetrySource` implements the same `TelemetrySource` protocol as the synthetic source, over
+  HTTP, reading only the four read paths. **The agent's tools did not change** — the claim M4 made when it
+  built them as factories over an injected source.
+- **Unavailable telemetry raises** (`TelemetryUnavailableError`) instead of returning an empty result:
+  "no data" and "we could not see the service" are different findings, and only one belongs in a
+  diagnosis. A response describing a different service is refused too, so two services' telemetry can
+  never be mixed silently.
+- Two honesty notes in the code: a healthy backlog is seeded at startup so a fresh container has a window
+  to investigate, and CPU/memory/dependency series are derived from the active fault because a synthetic
+  service has no CPU to measure. Each series carries a `basis` field saying which it is.
+- The end-to-end test injects a fault, drives real traffic, runs the full pipeline against the lab over
+  HTTP, and asserts that the evidence contains the deployment the lab recorded and the timeout the
+  service logged, that the remediation stopped at the approval gate with nothing executed, and that the
+  withheld answer key was never needed to get there.
+- Tests: 16 new in `tests/lab`, plus the adapter suite in `tests/telemetry/test_http_source.py`.
 
 ## Active work
 
@@ -234,8 +261,9 @@ step — which is the point of the tool factories built in M4.
 7. **No live model has answered yet.** Every number in the overview is measured, but from a
    deterministic provider; the first real call is still pending a provider key, and the live smoke test
    is excluded from the default run and from CI.
-8. **Telemetry is synthetic** until M6 ships the incident lab. The overview says so
-   (`data_sources: ["demo", "postgres"]`), which is why the label exists.
+8. **The service under investigation is a lab service.** Telemetry now comes from a real process that
+   really was slowed down, but it is still our own demo service, and the overview says so
+   (`data_sources: ["demo", "postgres"]`). It stops being `demo` when a live source produces it (M9).
 9. **Cost attribution is per step but not per tool call** — tool latency is recorded, tool spend is not
    a concept (no tool in M4 costs money).
 

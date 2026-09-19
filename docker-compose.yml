@@ -22,11 +22,25 @@ services:
       OPSPILOT_DATABASE_URL: postgresql+asyncpg://opspilot:opspilot@postgres:5432/opspilot
       # Spans always go to PostgreSQL; OTLP is only used when a viewer is actually running.
       OPSPILOT_OTEL_EXPORTER_OTLP_ENDPOINT: http://phoenix:6006
+      OPSPILOT_LAB_BASE_URL: http://demo-service:8081
     ports:
       - "8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
+
+  # The Incident Lab's demo service: an incident target, not part of the platform. Its read surface
+  # (/metrics, /logs, /deployments, /state) is what the agent's telemetry tools consume; its /admin
+  # surface injects faults and serves the withheld ground truth and is reachable only by tooling that
+  # holds the token.
+  demo-service:
+    build: .
+    command:
+      ["uvicorn", "opspilot.lab.service:app", "--host", "0.0.0.0", "--port", "8081"]
+    environment:
+      OPSPILOT_LAB_ADMIN_TOKEN: local-lab-admin
+    ports:
+      - "8081:8081"
 
   # Optional trace viewer: `docker compose --profile observability up -d phoenix`.
   # Not started by default: it is a viewer, and the platform must not depend on a viewer being up

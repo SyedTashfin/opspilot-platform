@@ -206,6 +206,21 @@ recorded it, rather than being baked into a report written before the action exi
 run that suspends leaves the report and the refusal both readable in the trace, and resumption is
 index-based, so the suspended step is the one that re-runs.
 
+## ADR-021 — The Incident Lab separates its read surface from its control surface
+
+Status: accepted 2026-09-19.
+
+The lab service exposes three surfaces: the service itself, a read surface that speaks the platform's
+telemetry shapes, and an admin surface (token-protected) that injects faults, restarts the service and
+serves the withheld ground truth. Rationale: the agent must be able to observe the incident and must not
+be able to read the answer key or change the target's behaviour, and both of those are enforced by
+structure rather than by prompt instruction — no agent tool points at `/admin`, and a test asserts it
+against the tool registry. The injection is also kept out of the service log stream, because a
+production service does not log that a fault was injected and an agent reading logs must not be handed
+the answer. Rejected: injecting faults via environment variables (needs a restart, and a restart is
+itself a fault-shaped event), and letting the platform inject through a tool (it would put the control
+API inside the agent's reachable surface).
+
 ## ADR-020 — A run's spans are persisted by the run store when the run ends
 
 Status: accepted 2026-09-19.

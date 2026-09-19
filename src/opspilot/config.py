@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     # Human approval for restricted tools.
     approval_ttl_seconds: int = Field(default=900, ge=60, le=86400)
 
+    # Incident Lab: the demo service's read surface and the control API's token. The token is only
+    # used by tooling that injects faults, never by an agent tool.
+    lab_base_url: str = "http://localhost:8081"
+    lab_admin_token: str = "local-lab-admin"  # noqa: S105 - dev default for the lab control API
     # Sampling below 1.0 is available but off by default: a demo trace is worth more complete than
     # it is cheap, and a sampled trace makes "where did that span go?" a debugging problem.
     trace_sample_ratio: float = 1.0
