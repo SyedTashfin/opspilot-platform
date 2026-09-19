@@ -25,7 +25,10 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://opspilot:opspilot@localhost:5432/opspilot"
 
     # Model gateway policy (enforced from M2 onward).
-    default_model: str = "deepseek/deepseek-chat"
+    # `deepseek-chat` and `deepseek-reasoner` were retired on 2026-07-24 and now route to the Flash
+    # model at the Flash price; the current documented identifier is used here so a configuration does
+    # not depend on a legacy alias.
+    default_model: str = "deepseek/deepseek-flash"
     fallback_model: str = "mistral/mistral-small-latest"
     extra_fallbacks: tuple[str, ...] = ()
     model_policy_overrides: dict[str, str] = Field(default_factory=dict)

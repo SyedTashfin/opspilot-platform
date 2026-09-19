@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import BaseModel
@@ -23,6 +24,7 @@ from opspilot.gateway.errors import (
 )
 from opspilot.gateway.gateway import GatewayConfig, ModelGateway
 from opspilot.gateway.policy import ModelPolicy
+from opspilot.gateway.pricing import cost_eur
 from opspilot.gateway.providers.fake import FakeProvider
 from opspilot.gateway.types import Message, ModelRequest, ProviderResult, Usage
 
@@ -130,8 +132,9 @@ async def test_success_records_one_call_with_known_cost() -> None:
     assert response.attempts == 1
     assert response.fallback_used is False
     assert response.cost_known is True
-    # 100 input * 0.25/M + 20 output * 1.00/M
-    assert response.cost_eur == pytest.approx(0.000045)
+    # Derived from the price table rather than restating a rate here: a price change must be one edit.
+    expected, _ = cost_eur(response.model, response.usage, at=datetime.now(UTC))
+    assert response.cost_eur == pytest.approx(expected or 0.0)
     assert len(h.recorder.calls) == 1
     assert h.recorder.calls[0].status is CallStatus.OK
     assert h.sleeps == []

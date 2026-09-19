@@ -206,6 +206,28 @@ recorded it, rather than being baked into a report written before the action exi
 run that suspends leaves the report and the refusal both readable in the trace, and resumption is
 index-based, so the suspended step is the one that re-runs.
 
+## ADR-023 — Prices encode the provider's rate windows; they are never averaged away
+
+Status: accepted 2026-09-19. Triggered by the first live call.
+
+The first real model call returned ``model=deepseek-flash`` and ``cost_known=False``, because the price
+table listed ``deepseek/deepseek-chat`` under rates that no longer exist. Three corrections followed:
+
+1. **The table keys on the model the provider reports**, not on the name we asked for. A provider may
+   serve an alias, and the served name is what appears on the bill.
+2. **Time-of-day pricing is encoded, not averaged.** DeepSeek bills peak hours at twice the off-peak rate
+   (01:00–04:00 and 06:00–10:00 UTC, Monday to Friday, per its published card). A table that stored one
+   blended number would be up to 2x wrong in a direction nobody could see, so the window is in the data
+   and ``rate_window()`` can report which one applied to a given cost.
+3. **Unpriced models still report ``cost_known=False``.** That behaviour is what surfaced this bug
+   instead of it hiding as a plausible small number.
+
+Two limitations are stated in the module rather than left implicit: all input is billed at the cache-miss
+rate (we cannot see cache hits, so the estimate may overstate but never understate), and USD prices are
+converted at a fixed recorded rate. Corollary: the configured default model was changed to
+``deepseek/deepseek-flash``, because ``deepseek-chat`` was retired on 2026-07-24 and depending on a
+retired alias is a silent way to be billed for a model nobody chose.
+
 ## ADR-022 — Structural grades gate CI; semantic grades are reported
 
 Status: accepted 2026-09-19.

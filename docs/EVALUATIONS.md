@@ -75,25 +75,24 @@ dependency, and a latency cost per query). The next change to retrieval must mak
 
 ## What is not measured yet
 
-- **Reasoning quality with a real model.** No provider key is configured on the machine this suite was
-  developed on (checked: process environment, macOS keychain, project `.env` — all absent), so every
-  semantic number here is a placeholder and is labelled as one. Taking the measurement is two steps:
+- **Reasoning quality across models.** One live call has been made (a structured-output smoke test), which
+  is how the pricing bug in ADR-023 was found. A full four-case model evaluation is the next run and its
+  numbers are not claimed here until they exist; reports are kept under `docs/eval-reports/`.
+
+  Taking that measurement:
 
   ```bash
-  printf 'MISTRAL_API_KEY=%s\n' '<your key>' >> .env   # .env is gitignored; never commit or paste a key
+  printf 'DEEPSEEK_API_KEY=%s\n' "$YOUR_KEY" >> .env   # .env is gitignored; never commit or paste a key
   set -a; . ./.env; set +a
-  uv run python -m opspilot.evals run --provider configured --model mistral/mistral-small-latest \
-      --fail-under 0.5 --out eval-report.json
+  uv run python -m opspilot.evals run --provider configured \
+      --model deepseek/deepseek-flash --out docs/eval-reports/<date>-deepseek-flash.json
   ```
 
   A preflight runs first and stops with the variable name if the key is missing (exit 3), so a missing
-  credential costs seconds rather than a half-finished suite. Both `api.mistral.ai` and
-  `api.deepseek.com` were reachable from this machine at the time of writing (they answered `401`
-  unauthenticated), so no network work is pending.
-
-  Expect the reference run's 0.00 EUR to become a real number of a few cents for four investigations at
-  `mistral-small` prices; the report's `total_cost_eur` is computed from the pricing table, not estimated.
-  A previously shared Mistral key appears in an old transcript, so use a rotated one.
+  credential costs seconds rather than a half-finished suite.
+- **Cost accuracy at the boundary.** The price table prices all input at the cache-miss rate, so a
+  cache-heavy workload will be *overstated*. Measured on the smoke call: 158 tokens cost €0.000028
+  (`deepseek-flash`, peak window at the time of the call).
 - **Cost per investigation on a real model.** The reference and fake providers are free; the cost figures
   in the platform overview are therefore zero, and the dashboard says `source: measured` with a basis that
   names `model_calls`, which is accurate and currently empty.

@@ -301,9 +301,12 @@ model, permission tests, and the failed-case retention M7 left to it.
 6. **Retrieval precision is poor and now measured**: hit@1 0.14, hit@3 0.71 (ADR-017's revisit condition
    is met). The fix is a ranking problem, not proof that embeddings are better; the next change to
    retrieval must move this table (see `docs/EVALUATIONS.md`).
-7. **No live model has answered yet.** Every number in the overview and every semantic grade is measured,
-   but from a deterministic provider; the first real call is still pending a provider key. `--provider
-   configured` is the command that will take that measurement, and it is not claimed to have run.
+7. **The first live call has now been made, and it immediately found a bug**: the provider served
+   `deepseek-flash` while the price table listed the retired `deepseek-chat`, so the call came back
+   `cost_known=False`. The table now keys on the served model name and encodes DeepSeek's peak/off-peak
+   windows rather than averaging them (ADR-023); the default model is the current documented identifier.
+   Cost remains conservative: all input is billed at the cache-miss rate because cache hits are not
+   visible to the platform.
 8. **The service under investigation is a lab service.** Telemetry now comes from a real process that
    really was slowed down, but it is still our own demo service, and the overview says so
    (`data_sources: ["demo", "postgres"]`). It stops being `demo` when a live source produces it (M9).
