@@ -1,0 +1,66 @@
+"""Enumerations that encode platform policy.
+
+Stored as plain ``VARCHAR(32)`` holding the lowercase value (``native_enum=False``) rather than as
+PostgreSQL native enums, and without a DB-level CHECK: adding a status later is then a code change
+instead of an ``ALTER TYPE`` migration, which matters for statuses that will grow.
+"""
+
+from __future__ import annotations
+
+from enum import StrEnum
+
+
+class AgentStatus(StrEnum):
+    DRAFT = "draft"
+    ACTIVE = "active"
+    DISABLED = "disabled"
+
+
+class RunStatus(StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    WAITING_APPROVAL = "waiting_approval"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    TIMEOUT = "timeout"
+    BUDGET_EXCEEDED = "budget_exceeded"
+
+
+class StepStatus(StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class CallStatus(StrEnum):
+    OK = "ok"
+    ERROR = "error"
+    TIMEOUT = "timeout"
+    REJECTED = "rejected"
+    NOT_EXECUTED = "not_executed"
+
+
+class PermissionClass(StrEnum):
+    """Tool authorisation classes. Everything defaults to the most restrictive useful option."""
+
+    READ_ONLY = "read_only"
+    WRITE_SAFE = "write_safe"
+    WRITE_RESTRICTED = "write_restricted"
+    ADMIN = "admin"
+
+
+class RiskLevel(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class ApprovalDecision(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
