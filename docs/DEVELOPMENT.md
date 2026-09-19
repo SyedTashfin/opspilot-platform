@@ -74,6 +74,19 @@ Budget and limit fields are bounded — `run_cost_cap_eur` may not exceed `daily
 limits cannot be set to values that would allow an unbounded loop. Invalid configuration fails fast
 rather than at the first expensive call.
 
+## Live-model tests
+
+The suite never calls a model by default (`addopts = "-q -m 'not live'"`), and CI does not run the
+`live` marker at all. To exercise a real provider:
+
+```bash
+export DEEPSEEK_API_KEY=...        # or MISTRAL_API_KEY / OPENAI_API_KEY, or put it in .env
+uv run pytest -m live -s           # -s so the printed cost and token counts are visible
+```
+
+It prints provider, model, tokens, computed cost, latency and attempt count, and asserts that the cost
+was computable — a live call whose price is missing from the table is a bug, not a rounding error.
+
 ## Environment notes
 
 - On the author's Mac the IPv6 route to `login.microsoftonline.com` is dead, which makes the Azure CLI

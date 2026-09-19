@@ -29,8 +29,14 @@ class Settings(BaseSettings):
     # Model gateway policy (enforced from M2 onward).
     default_model: str = "deepseek/deepseek-chat"
     fallback_model: str = "mistral/mistral-small-latest"
+    extra_fallbacks: tuple[str, ...] = ()
+    model_policy_overrides: dict[str, str] = Field(default_factory=dict)
     run_cost_cap_eur: float = Field(default=0.25, gt=0, le=5.0)
     daily_cost_cap_eur: float = Field(default=2.0, gt=0, le=50.0)
+    model_max_attempts: int = Field(default=3, ge=1, le=10)
+    model_timeout_seconds: float = Field(default=60.0, gt=0, le=600)
+    model_backoff_base_seconds: float = Field(default=0.5, ge=0, le=30)
+    model_backoff_max_seconds: float = Field(default=8.0, ge=0, le=120)
 
     # Run safety limits: every run has deterministic ceilings (never an unbounded loop).
     run_max_steps: int = Field(default=40, ge=1, le=200)

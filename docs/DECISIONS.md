@@ -127,3 +127,33 @@ session". Rejected: silent seeding, and rounding up empty states into plausible-
 Status: accepted 2026-09-19. The spec marks AKS/Helm/Argo as optional and secondary; the author already
 demonstrates that stack elsewhere. Time saved goes to evaluations, approvals and cost accounting, which
 are the differentiators. Revisit only after the deployed product satisfies the definition of done.
+
+## ADR-014 — Gateway shape: LiteLLM as transport, our policy and accounting on top
+
+Status: accepted 2026-09-19.
+
+LiteLLM is used as an in-process transport adapter (vendor wire formats, usage normalisation) behind
+`opspilot.gateway`. Model policy, fallback order, retries, timeouts, budget enforcement and cost
+accounting are ours, so the provider library is replaceable without touching a single caller.
+
+Rejected: **running LiteLLM as a proxy service** — one more deployable and a network hop for a
+single-tenant demo; **hand-written vendor clients** — commodity work, and per-vendor usage quirks are
+a tar pit.
+
+Two consequences worth stating explicitly:
+
+1. **Our own price table, dated and in one place**, with unknown models producing
+   `cost_known=False` rather than a plausible zero. A dashboard must be able to say "cost unknown"
+   instead of quietly under-reporting.
+2. **Retry taxonomy is by exception class**: `ProviderTimeout` and `ProviderError` are retried;
+   `ProviderBadResponse` and `ProviderRequestRejected` are not, because retrying a rejected request or
+   an unparsable answer wastes time and money. Budget checks run *before* the call against already
+   recorded spend, which makes the cap a lower bound — documented rather than papered over.
+
+## ADR-015 — Failures are recorded, not swallowed
+
+Status: accepted 2026-09-19. A run that exhausts every model in its chain writes exactly one
+`model_calls` row with `status=error`, the last model tried, and the concatenated reasons, then raises
+`AllModelsFailed`. Agent steps must therefore choose: propagate, degrade, or abort — but they cannot
+silently continue on a failed grounding call.
+

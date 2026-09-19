@@ -1,24 +1,25 @@
 # Project state
 
-Last updated: 2026-09-19 (end of M1).
+Last updated: 2026-09-19 (end of M2).
 
 ## Current milestone
 
-**M0 (research and architecture) and M1 (local skeleton) complete.**
+**M0 (research and architecture), M1 (local skeleton) and M2 (model gateway) complete.**
 
-M1 verification, all run locally on 2026-09-19:
+Verification, all run locally on 2026-09-19 against the real stack:
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Formatting | `uv run ruff format --check .` | 32 files already formatted |
+| Formatting | `uv run ruff format --check .` | 48 files already formatted |
 | Lint | `uv run ruff check .` | all checks passed |
-| Types | `uv run mypy src` | no issues in 15 source files |
-| Tests | `uv run pytest` | 22 passed, 1 skipped (DB integration: no local PostgreSQL) |
-| Migration | `uv run alembic upgrade head --sql` | renders 7 tables + 5 indexes + alembic_version, exit 0 |
+| Types | `uv run mypy src` | no issues in 26 source files |
+| Tests | `uv run pytest` | 59 passed, including the live-PostgreSQL integration test |
+| Migration (offline) | `uv run alembic upgrade head --sql` | renders 7 tables + 5 indexes + alembic_version |
+| Migration (live) | `uv run alembic upgrade head` | applied to PostgreSQL 16; tables confirmed with `\dt` |
+| Live model call | `uv run pytest -m live -s` | **not run** — no provider key configured yet |
 
-One step is deliberately **not** yet proven: applying the migration against a live PostgreSQL. Docker
-Desktop's daemon is stopped on the author's machine, so the integration test skips rather than passing
-falsely. That verification is the first task of M2.
+The M1 gap is closed: the schema is applied to a real database and the integration test drives a run
+lifecycle (agent → run → model call → step) through it.
 
 
 ## Architecture (settled)
@@ -63,13 +64,35 @@ Full rationale and rejected alternatives: `docs/DECISIONS.md`.
   opt-in integration test that refuses to run against a database whose name lacks `test`.
 - `THIRD_PARTY.md`, `docs/DEVELOPMENT.md`, `docs/COSTS.md`, `apps/web/README.md` (M11 placeholder).
 
+### M2 — model gateway (complete)
+
+- `opspilot.gateway` is the only path from the platform to a language model; no agent imports a vendor
+  SDK. Types, policy, pricing, accounting and the gateway itself are separate modules (ADR-014).
+- **Model policy**: steps resolve to an ordered chain (primary + fallbacks) from configuration, so
+  moving a step to a cheaper or stronger model is a config change with a measurable effect.
+- **Providers**: a `ModelProvider` protocol, a deterministic `FakeProvider` (scriptable failures,
+  timeouts, valid structured objects, no network), and a `LiteLLMProvider` importing litellm lazily.
+- **Retries and fallback**: bounded exponential backoff with a cap, retries only for retryable failure
+  classes, then the next model in the chain; every failure reason is carried into the raised error.
+- **Budgets**: run and daily ceilings checked before the call against recorded spend; exceeding either
+  raises `BudgetExceeded` without attempting the call.
+- **Accounting**: every successful call records provider, model, request id, tokens, latency, attempts,
+  fallback flag and computed cost. Unknown pricing yields `cost_known=False` — never a plausible zero.
+  A fully failed chain records exactly one `status=error` row (ADR-015).
+- **Price table** (`pricing.py`) is dated, in one place, and supports version-suffixed model names.
+- Tests: 12 gateway behaviour tests (retry, backoff cap, fallback, non-retryable short-circuit, budget
+  refusal, unknown cost, no-provider, structured-output invariant) plus policy, pricing, accounting and
+  fake-provider suites — all without a network, a clock dependency or a token spent.
+- Opt-in `live` marker: one real call that prints model, tokens, measured cost and latency, skipped
+  unless a provider key is present, and excluded from the default run and from CI.
+
 
 ## Active work
 
-M2 — model gateway: provider abstraction, model policy, retries and timeouts, per-call token and cost
-accounting into `model_calls`, a deterministic fake provider for CI, and the first live-model smoke test
-(opt-in, cost printed before it runs). Pending prerequisite: bring PostgreSQL up (Docker Desktop) and
-apply the initial migration.
+M3 — tool registry: tool definitions with input/output schemas, permission classes
+(`read_only` → `admin`), risk levels, timeouts and approval requirements; a registry that refuses
+unregistered tools; an append-only audit record for every execution including refusals; and an MCP
+client so one real external server (Azure MCP or Grafana MCP) is reachable through the same registry.
 
 ## Outstanding work (planned milestones)
 
