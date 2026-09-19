@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 from opspilot.agent.store import StepRecord
 from opspilot.agent.types import RunState, StepResult
+from opspilot.agents.opspilot.guardrails import detect_injections, flag_texts
 from opspilot.agents.opspilot.prompts import classification_messages, diagnosis_messages
 from opspilot.agents.opspilot.schemas import (
     Classification,
@@ -127,6 +128,10 @@ class EvidenceStep:
     async def run(self, state: RunState) -> StepResult:
         items = assemble_evidence(state)
         state.put("evidence", items)
+        # Retrieved text is untrusted. Scan it once, deterministically, and record what was found: the
+        # flags go into the report so a reviewer can see the agent was exposed to it (M7/M8).
+        flags = detect_injections({item.evidence_id: f"{item.summary} {item.detail}" for item in items})
+        state.put("injection_flags", flags)
         by_kind: dict[str, int] = {}
         for item in items:
             by_kind[item.kind] = by_kind.get(item.kind, 0) + 1
@@ -134,6 +139,7 @@ class EvidenceStep:
             f"{len(items)} evidence items assembled",
             evidence_ids=[item.evidence_id for item in items],
             by_kind=by_kind,
+            injection_flags=flag_texts(flags),
         )
 
 
@@ -382,7 +388,8 @@ def build_report(state: RunState) -> InvestigationReport:
     diagnosis: Diagnosis = state.require("diagnosis")
     remediation: RemediationProposal | None = state.get("remediation")
     sources = sorted({item.source for item in evidence})
-    notes = []
+    flags = flag_texts(state.get("injection_flags", []))
+    notes = list(flags)
     if diagnosis.unsupported_evidence_ids:
         notes.append(
             "the model cited evidence ids that do not exist: " + ", ".join(diagnosis.unsupported_evidence_ids)
@@ -399,6 +406,7 @@ def build_report(state: RunState) -> InvestigationReport:
         model=state.get("model"),
         data_sources=sources,
         notes=notes,
+        injection_flags=flags,
     )
 
 

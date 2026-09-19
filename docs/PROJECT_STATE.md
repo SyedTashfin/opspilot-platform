@@ -1,21 +1,24 @@
 # Project state
 
-Last updated: 2026-09-19 (end of M6).
+Last updated: 2026-09-19 (end of M7).
 
 ## Current milestone
 
-**M0–M6 complete**: research and architecture, local skeleton, model gateway, tool registry and audit,
-agent runtime and OpsPilot pipeline, observability and platform metrics, and the Incident Lab.
+**M0–M7 complete**: research and architecture, local skeleton, model gateway, tool registry and audit,
+agent runtime and OpsPilot pipeline, observability and platform metrics, the Incident Lab, and the
+evaluation suite.
 
 Verification, all run locally on 2026-09-19 against the real stack:
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Formatting | `uv run ruff format --check src tests migrations` | 94 files already formatted |
+| Formatting | `uv run ruff format --check src tests migrations` | 106 files already formatted |
 | Lint | `uv run ruff check src tests migrations` | all checks passed |
-| Types | `uv run mypy src` | no issues in 62 source files |
-| Tests | `uv run pytest` | **192 passed, 1 deselected** (live marker), 12 of them against live PostgreSQL |
-| Incident Lab | `uv run pytest tests/lab -q` | 16 tests: fault injection really changes behaviour, and the answer key never reaches the read surface |
+| Types | `uv run mypy src` | no issues in 71 source files |
+| Tests | `uv run pytest` | **228 passed, 1 deselected** (live marker), 12 of them against live PostgreSQL, in 16s |
+| Evaluation suite | `uv run python -m opspilot.evals run --provider reference` | **structural gate PASS**, 4/4 cases, 0.00 EUR, ~2s; report written to JSON |
+| Negative control | `... --provider fake` | the suite **fails**: a meaningless answer is caught by the citation grade |
+| Retrieval benchmark | part of the suite | hit@1 0.14, hit@3 0.71 over 7 paraphrased queries (see below) |
 | Compose | `docker compose config --quiet` | valid, including the lab service |
 | Migration (live) | `uv run alembic upgrade head` | `0003_spans` applied to PostgreSQL 16; `spans` table confirmed |
 | Trace read-back | `tests/integration/test_spans_and_metrics.py` | spans round-trip through PostgreSQL; the overview aggregates rows the test inserted and can count by hand |
@@ -222,7 +225,45 @@ Full rationale and rejected alternatives: `docs/DECISIONS.md`.
   withheld answer key was never needed to get there.
 - Tests: 16 new in `tests/lab`, plus the adapter suite in `tests/telemetry/test_http_source.py`.
 
+### M7 — the evaluation suite (complete)
+
+- `opspilot.evals` runs four cases through the real pipeline against the real lab service over HTTP:
+  latency after a deployment changed dependency timeouts, an error spike from a dependency outage, CPU
+  saturation, and an adversarial case. Nothing is mocked except the model.
+- **Two families of grade, only one of them gated** (ADR-022). Structural: run completed, budgets
+  respected, citations grounded, no unapproved action, forbidden actions avoided, no injection compliance.
+  Semantic: expected tools used, root-cause match. Structural grades gate CI; semantic grades are reported
+  with their method, because gating on a placeholder model's opinion would be theatre.
+- **The root-cause grader is keyword-based and says so in its own output.** It is not an LLM judge and its
+  known weakness (a correct diagnosis phrased unexpectedly scores low) is documented rather than
+  discovered later.
+- **A negative control exists and is documented**: with the gateway's `fake` provider — which cites an id
+  that does not exist — the suite *fails* the citation and completion grades. A suite in which a
+  meaningless answer passes is not measuring anything.
+- `reference` answers from the case's own answer key, so its semantic scores are the harness's **ceiling,
+  not a model's ability**, and the CLI prints that sentence after every reference run.
+- **Injection defence is now measured, not asserted.** `guardrails.py` scans retrieved evidence for
+  instruction-shaped content (override, spoofed role, concealment, auto-approval, destructive command,
+  urgent restricted action), records matches in the report as `injection_flags`, and the adversarial case
+  asserts the flag is raised *and* that nothing executed. The detector is deliberately narrow, and a test
+  asserts it produces zero flags on the five shipped runbooks — a detector that fires on normal content
+  would make the gate meaningless.
+- **The retrieval question from ADR-017 is now answered with numbers**: hit@1 0.14, hit@3 0.71 over seven
+  paraphrased queries. Recall@3 is usable, precision@1 is poor, and two queries with no vocabulary overlap
+  retrieve nothing useful. That is the evidence ADR-017 asked for, and it points at ranking (heading
+  weighting, separate symptom sections, or a reranker) rather than at embeddings being universally better.
+- CI gained an `evaluation` job running the structural gate on every push, uploading the JSON report as a
+  build artefact. The lab runs in process, so the job needs no container and no network.
+- `docs/EVALUATIONS.md` records the methods, the current numbers, and — explicitly — what is *not*
+  measured yet: reasoning quality with a real model, cost per investigation, and remediation verification.
+- Tests: 36 new across `tests/evals` (grader arithmetic, including four negative graders, the suite end to
+  end, the negative control, the dataset's coherence, and the retrieval benchmark).
+
 ## Active work
+
+M8 — security and approvals: the approval workflow end to end (request, single-use token bound to the
+arguments, resume the suspended run, and verify the action actually restored the service), the threat
+model, permission tests, and the failed-case retention M7 left to it.
 
 ## Outstanding work (planned milestones)
 
@@ -256,11 +297,12 @@ Full rationale and rejected alternatives: `docs/DECISIONS.md`.
    ground truth must never leak into prompts, tools or retrieval. M4 keeps the fault and root cause in
    the scenario harness (`for_agent()` exposes the alert only) and a test asserts that no step detail,
    summary or tool output contains either.
-6. **Retrieval is lexical** (ADR-017). Paraphrased symptoms may not match a runbook; this is expected to
-   be the most likely weak point and is the first thing M7 should measure.
-7. **No live model has answered yet.** Every number in the overview is measured, but from a
-   deterministic provider; the first real call is still pending a provider key, and the live smoke test
-   is excluded from the default run and from CI.
+6. **Retrieval precision is poor and now measured**: hit@1 0.14, hit@3 0.71 (ADR-017's revisit condition
+   is met). The fix is a ranking problem, not proof that embeddings are better; the next change to
+   retrieval must move this table (see `docs/EVALUATIONS.md`).
+7. **No live model has answered yet.** Every number in the overview and every semantic grade is measured,
+   but from a deterministic provider; the first real call is still pending a provider key. `--provider
+   configured` is the command that will take that measurement, and it is not claimed to have run.
 8. **The service under investigation is a lab service.** Telemetry now comes from a real process that
    really was slowed down, but it is still our own demo service, and the overview says so
    (`data_sources: ["demo", "postgres"]`). It stops being `demo` when a live source produces it (M9).

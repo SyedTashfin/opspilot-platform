@@ -206,6 +206,22 @@ recorded it, rather than being baked into a report written before the action exi
 run that suspends leaves the report and the refusal both readable in the trace, and resumption is
 index-based, so the suspended step is the one that re-runs.
 
+## ADR-022 — Structural grades gate CI; semantic grades are reported
+
+Status: accepted 2026-09-19.
+
+The evaluation suite produces two families of grade. Structural grades are deterministic and
+model-independent — did the run finish within its budgets, does every citation refer to evidence that
+exists, did a restricted action execute without approval, was an instruction embedded in retrieved data
+flagged and not acted on. Semantic grades need a model to mean anything — is the root cause right, were
+the right tools used. **Only structural grades gate CI.** Gating on a semantic score produced by the
+`reference` provider would measure the harness twice and call it an evaluation; gating on it with the
+gateway's `fake` provider would gate on noise. Consequently CI runs `--provider reference` (proves the
+harness, fast, free) and the suite's negative control is a separate documented run with `--provider fake`,
+which must fail. The root-cause grader is keyword-based and states that in its own output; an LLM judge is
+the natural upgrade and is not claimed. Corollary: a real model evaluation is a separate, deliberate run
+with a key, and its numbers are labelled as such wherever they appear.
+
 ## ADR-021 — The Incident Lab separates its read surface from its control surface
 
 Status: accepted 2026-09-19.

@@ -37,3 +37,24 @@ jobs:
       - run: uv sync --locked
       - name: Unit and API tests (no live model, no live database)
         run: uv run pytest -q
+
+  evaluation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv sync --locked
+      # The Incident Lab runs in process, so the suite needs no container and no network.
+      - name: Evaluation suite (structural gate)
+        run: uv run python -m opspilot.evals run --provider reference --out eval-report.json
+      - name: Publish the report as a build artefact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: eval-report.json
+          if-no-files-found: warn
+          retention-days: 14

@@ -92,6 +92,8 @@ class InvestigationReport(BaseModel):
     model: str | None = None
     data_sources: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+    #: Instruction-shaped content found in retrieved data. Recorded, never acted on automatically.
+    injection_flags: list[str] = Field(default_factory=list)
 
 
 def ground_diagnosis(draft: DiagnosisDraft, evidence: list[EvidenceItem]) -> Diagnosis:

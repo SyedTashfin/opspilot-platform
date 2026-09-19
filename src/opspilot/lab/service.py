@@ -36,6 +36,7 @@ from opspilot.lab.faults import (
 # OPSPILOT_LAB_ADMIN_TOKEN, and no agent tool points at that surface anyway.
 DEFAULT_ADMIN_TOKEN = "local-lab-admin"  # noqa: S105
 BASE_LATENCY_MS = 45.0
+MAX_SIMULATED_SLEEP_MS = 300.0
 
 
 class InjectionRequest(BaseModel):
@@ -106,7 +107,9 @@ def create_lab_app(
         if fault.kind is FaultKind.ERRORS and rate == 0.0:
             rate = 1.0
         failed = rate > 0 and random.random() < rate  # noqa: S311 - simulated failure rate
-        await asyncio.sleep(min(latency, 1_500) / 1_000)
+        # The sleep is capped for the benefit of test and demo runtime; the latency the service
+        # *reports and records* is the computed fault latency, and that is what telemetry reads.
+        await asyncio.sleep(min(latency, MAX_SIMULATED_SLEEP_MS) / 1_000)
         lab.observe(latency_ms=latency, status=503 if failed else 200)
 
         if failed:

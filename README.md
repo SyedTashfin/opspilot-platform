@@ -56,6 +56,10 @@ Published from stored evaluation runs only (`docs/EVALUATIONS.md`). Empty until 
 
 ## 7. Technology
 
+```
+uv run python -m opspilot.evals run --provider reference   # the evaluation suite, structural gate
+```
+
 Python 3.12 · FastAPI · Pydantic v2 · SQLAlchemy 2 + Alembic · PostgreSQL + pgvector · PydanticAI ·
 LiteLLM · OpenTelemetry · Phoenix · MCP (Python SDK) · Next.js + TypeScript · Docker · Terraform ·
 Azure Container Apps · GitHub Actions (OIDC). Rationale for each in `docs/research/oss-evaluation.md`.
