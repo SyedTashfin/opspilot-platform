@@ -122,6 +122,32 @@ def request(step: str = "diagnose", response_model: type[BaseModel] | None = Non
     )
 
 
+async def test_a_priced_call_credits_the_ledger() -> None:
+    """Without a credit path the in-memory ledger stays at zero and every cost ceiling is decorative."""
+    stub = StubProvider(name="stub", models=(PRIMARY,))
+    h = harness([stub])
+
+    assert await h.ledger.spent_in_run_eur(RUN_ID) == 0.0
+
+    response = await h.gateway.complete(request(), RUN_ID)
+
+    assert response.cost_known is True
+    assert await h.ledger.spent_in_run_eur(RUN_ID) == pytest.approx(response.cost_eur or 0.0)
+    assert await h.ledger.spent_today_eur() == pytest.approx(response.cost_eur or 0.0)
+    assert h.ledger.credited == 1
+
+
+async def test_an_unpriced_call_credits_nothing_rather_than_zero() -> None:
+    stub = StubProvider(name="stub", models=("exotic/model-1",))
+    h = harness([stub], primary="exotic/model-1")
+
+    response = await h.gateway.complete(request(), RUN_ID)
+
+    assert response.cost_known is False
+    assert await h.ledger.spent_in_run_eur(RUN_ID) == 0.0
+    assert h.ledger.credited == 0
+
+
 async def test_success_records_one_call_with_known_cost() -> None:
     stub = StubProvider(name="stub", models=(PRIMARY,))
     h = harness([stub])

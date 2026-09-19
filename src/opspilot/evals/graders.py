@@ -267,6 +267,23 @@ def grade_root_cause(case: EvalCase, report: InvestigationReport | None) -> Grad
             method="no report to check",
         )
     diagnosis = _normalise(f"{report.diagnosis.root_cause} {report.diagnosis.summary}")
+    disqualified = [phrase for phrase in case.disqualifying_terms if _normalise(phrase) in diagnosis]
+    if disqualified:
+        return GradeResult(
+            name=GradeName.ROOT_CAUSE_MATCH,
+            kind=GradeKind.SEMANTIC,
+            passed=False,
+            score=0.0,
+            method=(
+                "keyword match, with disqualifiers: naming a cause this case rules out fails the grade "
+                "even when familiar words are also present"
+            ),
+            detail={
+                "disqualified_by": disqualified,
+                "diagnosis": report.diagnosis.root_cause[:400],
+                "confidence": report.diagnosis.confidence,
+            },
+        )
     groups = case.required_terms or tuple((phrase,) for phrase in case.acceptable_diagnoses)
     if not groups:
         return GradeResult(

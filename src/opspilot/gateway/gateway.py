@@ -81,6 +81,11 @@ class ModelGateway:
             # cost_eur is None when the model has no price on file. Record the cost only when it is
             # known: writing 0.0 would put a plausible zero in the trace, which is the one thing the
             # pricing table exists to avoid.
+            # Credit the ledger so the ceilings have something to enforce against. Without this the
+            # in-memory ledger stays at zero, every cost budget is decorative, and a run reports itself
+            # as free — a bug that a free deterministic provider can hide indefinitely.
+            if response.cost_known and response.cost_eur:
+                await self.ledger.credit(run_id, float(response.cost_eur))
             cost_attributes = (
                 {"llm.cost_eur": float(response.cost_eur)}
                 if response.cost_known and response.cost_eur is not None

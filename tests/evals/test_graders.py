@@ -225,6 +225,34 @@ def test_the_keyword_root_cause_grader_scores_by_required_terms(root_cause: str,
     assert "keyword" in result.method
 
 
+def test_a_wrong_cause_is_not_rescued_by_familiar_words() -> None:
+    """Regression: the first live run blamed one deployment for three different incidents and scored 1.0.
+
+    The text below is verbatim from that run. It contains the words "timeout", "limit" and "cpu"-adjacent
+    phrasing, so a presence-only grader passed it — which is why disqualifiers exist.
+    """
+    case = next(c for c in build_dataset() if c.case_id == "rec-error-spike")
+    live_text = (
+        "The most recent deployment (rec-2026.06.1) changed the feature-store client timeout from "
+        "2000ms to 400ms and increased retries from 1 to 4 without jitter, so requests fail against a "
+        "dependency under load."
+    )
+
+    result = grade_root_cause(case, report(root_cause=live_text))
+
+    assert not result.passed
+    assert result.score == 0.0
+    assert result.detail["disqualified_by"]
+    assert "disqualifiers" in result.method
+
+
+def test_the_correct_answer_for_each_case_still_passes() -> None:
+    for case in build_dataset():
+        correct = case.acceptable_diagnoses[0]
+        result = grade_root_cause(case, report(root_cause=correct))
+        assert result.passed, (case.case_id, result.detail)
+
+
 def test_the_root_cause_grader_says_it_is_not_an_llm_judge() -> None:
     result = grade_root_cause(CASE, report())
 

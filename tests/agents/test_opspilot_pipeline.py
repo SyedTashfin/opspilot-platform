@@ -268,17 +268,25 @@ async def test_a_run_that_suspends_records_the_proposal_as_data() -> None:
     assert gate.detail["arguments_hash"]
 
 
-async def test_a_tool_outside_the_allowlist_is_refused_before_it_is_called() -> None:
+async def test_a_tool_outside_the_allowlist_is_refused_and_recorded_not_executed() -> None:
+    """A proposal the agent may not execute is a finding about the proposal, not a failed investigation."""
     provider = terminating_provider("shell.exec", {"command": "rm -rf /"}, ["ev-logs", "ev-deployments"])
     harness = build_harness(provider)
 
     summary, records = await run_pipeline(harness)
+    report = report_from_steps(records)
 
-    assert summary.status is RunStatus.FAILED
+    assert summary.status is RunStatus.SUCCEEDED
     assert records[-1].name == "propose_remediation"
-    assert records[-1].status is StepStatus.FAILED
-    assert "outside its allowed tool set" in (records[-1].summary or "")
-    assert "shell.exec" not in harness.audit.subjects()
+    assert records[-1].status is StepStatus.SUCCEEDED
+    assert "outside this agent's allowed tool set" in (records[-1].summary or "")
+    assert "shell.exec" not in harness.audit.subjects()  # never reached the executor at all
+    assert report is not None
+    assert report.remediation is not None
+    assert report.remediation.status == "rejected"
+    assert report.remediation.tool_name == "shell.exec"
+    assert report.remediation.detail["reason"]
+    assert report.diagnosis.grounding_ratio == 1.0
 
 
 async def test_the_pipeline_is_deterministic_across_runs() -> None:

@@ -67,6 +67,15 @@ class ModelCallRecorder(Protocol):
 
 
 class CostLedger(Protocol):
+    """Spend, for enforcement.
+
+    ``credit`` exists because a ledger that is never credited silently disables every cost ceiling and
+    reports a run as free. Implementations backed by a table of calls derive spend from those rows and
+    treat ``credit`` as a no-op, because crediting there would double count.
+    """
+
+    async def credit(self, run_id: uuid.UUID, amount_eur: float) -> None: ...
+
     async def spent_today_eur(self) -> float: ...
 
     async def spent_in_run_eur(self, run_id: uuid.UUID) -> float: ...
@@ -93,7 +102,13 @@ class InMemoryLedger:
     """Test double with an explicitly settable "today" total, so tests are not clock-dependent."""
 
     by_run: dict[uuid.UUID, float] = field(default_factory=dict)
+    credited: int = 0
     today: float = 0.0
+
+    async def credit(self, run_id: uuid.UUID, amount_eur: float) -> None:
+        self.by_run[run_id] = self.by_run.get(run_id, 0.0) + amount_eur
+        self.today += amount_eur
+        self.credited += 1
 
     async def spent_today_eur(self) -> float:
         return self.today
@@ -139,6 +154,13 @@ class PostgresLedger:
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    async def credit(self, run_id: uuid.UUID, amount_eur: float) -> None:
+        """No-op on purpose: this ledger sums ``model_calls``, which the recorder already wrote.
+
+        Crediting here as well would count every call twice and halve the effective budget.
+        """
+        return None
 
     async def spent_today_eur(self) -> float:
         start_of_day = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)

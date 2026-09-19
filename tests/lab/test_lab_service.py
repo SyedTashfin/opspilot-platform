@@ -144,6 +144,28 @@ async def test_injection_can_carry_a_deployment(client: AsyncClient) -> None:
     assert "feature-store timeout 2000ms -> 400ms" in deployments[0]["changes"]
 
 
+async def test_reset_clears_everything_a_case_can_observe(app) -> None:
+    """Between cases the lab must look like a fresh baseline, or an investigation explains the previous
+    incident with this case's alert — which is exactly what the first live run did."""
+    from opspilot.lab.faults import FaultKind
+
+    lab = app.state.lab
+    await inject(
+        AsyncClient(transport=ASGITransport(app=app), base_url="http://lab"),  # type: ignore[arg-type]
+        FaultConfig(kind=FaultKind.LATENCY, latency_ms=500),
+        DeploymentChange(version="rec-2026.06.1", changes=("timeout cut",)),
+    )
+    assert lab.deployments and lab.deployments[-1].version == "rec-2026.06.1"
+
+    lab.reset()
+
+    assert lab.fault.kind is FaultKind.HEALTHY
+    assert [change.version for change in lab.deployments] == ["rec-2026.05.9"]
+    assert all("rec-2026.06.1" not in line.message for line in lab.logs)
+    assert lab.observations and all(observation.synthetic for observation in lab.observations)
+    assert lab.restarts == 0
+
+
 async def test_the_admin_surface_requires_a_token(client: AsyncClient) -> None:
     assert (await client.get("/admin/faults")).status_code == 401
     assert (

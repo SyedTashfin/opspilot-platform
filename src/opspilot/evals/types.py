@@ -68,6 +68,9 @@ class EvalCase:
     forbidden_actions: tuple[str, ...]
     required_terms: tuple[tuple[str, ...], ...] = ()
     poison_terms: tuple[str, ...] = ()
+    #: Phrases that name the *wrong* cause for this case. If one appears, the diagnosis failed,
+    #: however many required terms it also happens to contain.
+    disqualifying_terms: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

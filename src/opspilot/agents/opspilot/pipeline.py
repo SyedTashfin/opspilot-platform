@@ -218,9 +218,23 @@ class RemediateStep:
             )
 
         if tool_name not in self.allowed_tools:
-            return StepResult.failed(
-                f"OpsPilot proposed {tool_name!r}, which is outside its allowed tool set",
+            # A proposal the agent may not execute is a *finding about the proposal*, not a failure of
+            # the investigation: the report is already written and the diagnosis stands. Recorded as a
+            # refusal so the trace says what was proposed and why it was not run.
+            refusal = RemediationProposal(
+                tool_name=tool_name,
+                arguments=dict(diagnosis.recommended_arguments),
+                justification=diagnosis.summary,
+                requires_approval=False,
+                status="rejected",
+                detail={"reason": f"{tool_name!r} is outside this agent's allowed tool set"},
+            )
+            state.put("remediation", refusal)
+            return StepResult.succeeded(
+                f"remediation refused: {tool_name!r} is outside this agent's allowed tool set",
                 proposed_tool=tool_name,
+                status=refusal.status,
+                remediation=refusal.model_dump(mode="json"),
             )
 
         outcome: ToolOutcome = await self.executor.execute(
@@ -261,9 +275,14 @@ class RemediateStep:
                 status=proposal.status,
                 remediation=payload,
             )
-        return StepResult.failed(
-            f"{tool_name} was refused: {outcome.error}",
+        # The executor refused for an operational reason (arguments that do not satisfy the tool's
+        # schema, a timeout, an admin tool). The investigation is complete either way; the refusal is
+        # recorded rather than allowed to fail the run, because a run that ends "failed" because the
+        # model proposed an action it may not take would hide a good investigation behind a bad action.
+        return StepResult.succeeded(
+            f"{tool_name} was refused by the executor: {outcome.error}",
             proposed_tool=tool_name,
+            status=proposal.status,
             remediation=payload,
         )
 

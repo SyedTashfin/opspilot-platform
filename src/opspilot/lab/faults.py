@@ -166,6 +166,29 @@ class LabState:
         self.injected_at = None
         self.injections.append({"at": datetime.now(UTC).isoformat(), "kind": "cleared", "note": ""})
 
+    def reset(self, *, baseline_version: str = "rec-2026.05.9") -> None:
+        """Return the lab to a clean baseline between cases.
+
+        Clearing the fault is not enough: deployments, logs and observations from the previous case stay
+        behind, and an investigation then explains the *previous* incident with this case's alert. Every
+        field a case can observe is reset here, and a live run is what showed why that matters.
+        """
+        self.fault = FaultConfig()
+        self.injected_at = None
+        self.logs.clear()
+        self.deployments.clear()
+        self.observations.clear()
+        self.restarts = 0
+        self.injections.clear()
+        self.seed_backlog()
+        self.deployments.append(
+            DeploymentChange(
+                version=baseline_version,
+                changes=("dependency client timeout unchanged at 2000ms", "cache warmup off"),
+            )
+        )
+        self.log("INFO", "service started", version=baseline_version)
+
     def record_restart(self) -> None:
         self.restarts += 1
         self.log("WARN", "service restarted by remediation")

@@ -169,6 +169,11 @@ async def run_suite(cases: Sequence[EvalCase], config: SuiteConfig) -> SuiteRepo
     started = time.perf_counter()
     results: list[CaseResult] = []
     for case in cases:
+        # A clean baseline per case: the previous case's fault, logs and deployments must not be
+        # visible to this one (see LabState.reset).
+        lab_state = getattr(app.state, "lab", None)
+        if lab_state is not None:
+            lab_state.reset()
         await control.clear()
         outcome = await run_case(case, config, transport=transport, control=control)
         results.append(outcome.result)
