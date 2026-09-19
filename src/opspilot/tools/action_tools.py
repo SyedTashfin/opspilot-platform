@@ -81,9 +81,7 @@ def action_tools(log: ActionLog) -> list[ToolDefinition]:
     return [
         ToolDefinition(
             name="azure.restart_service",
-            description=(
-                "Restart a service. Restricted: requires human approval for these arguments."
-            ),
+            description=("Restart a service. Restricted: requires human approval for these arguments."),
             handler=restart_service,
             input_model=RestartArgs,
             output_model=ActionAccepted,
@@ -93,9 +91,7 @@ def action_tools(log: ActionLog) -> list[ToolDefinition]:
         ),
         ToolDefinition(
             name="azure.rollback_deployment",
-            description=(
-                "Roll a service back to a previous version. Restricted: needs human approval."
-            ),
+            description=("Roll a service back to a previous version. Restricted: needs human approval."),
             handler=rollback_deployment,
             input_model=RollbackArgs,
             output_model=ActionAccepted,

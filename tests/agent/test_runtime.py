@@ -39,9 +39,7 @@ class StubStep:
 class RecordingTracer:
     spans: list[tuple[str, int]] = field(default_factory=list)
 
-    def step_span(
-        self, *, name: str, run_id: uuid.UUID, index: int, attributes: Mapping[str, Any]
-    ) -> Any:
+    def step_span(self, *, name: str, run_id: uuid.UUID, index: int, attributes: Mapping[str, Any]) -> Any:
         from contextlib import contextmanager
 
         @contextmanager
@@ -166,9 +164,7 @@ async def test_wall_clock_budget_stops_the_run() -> None:
     slow.on_run = lambda: clock_advance(500)
     steps = [slow, StubStep("after")]
 
-    runtime, _ = build(
-        steps, limits=RunLimits(max_steps=10, timeout_seconds=60, cost_cap_eur=1), clock=clock
-    )
+    runtime, _ = build(steps, limits=RunLimits(max_steps=10, timeout_seconds=60, cost_cap_eur=1), clock=clock)
     summary = await runtime.execute(agent="opspilot", request=REQUEST, steps=steps)
 
     assert summary.status is RunStatus.TIMEOUT
@@ -183,9 +179,7 @@ async def test_cost_budget_is_checked_before_the_first_step() -> None:
     run_id = await store.create_run(agent="opspilot", request=REQUEST, model=None)
     ledger.by_run[run_id] = 0.30
 
-    summary = await runtime.execute(
-        agent="opspilot", request=REQUEST, steps=steps, resume_run_id=run_id
-    )
+    summary = await runtime.execute(agent="opspilot", request=REQUEST, steps=steps, resume_run_id=run_id)
 
     assert summary.status is RunStatus.BUDGET_EXCEEDED
     assert calls == []
@@ -207,9 +201,7 @@ async def test_resuming_skips_steps_already_recorded() -> None:
         duration_ms=12,
     )
 
-    summary = await runtime.execute(
-        agent="opspilot", request=REQUEST, steps=steps, resume_run_id=run_id
-    )
+    summary = await runtime.execute(agent="opspilot", request=REQUEST, steps=steps, resume_run_id=run_id)
 
     assert summary.status is RunStatus.SUCCEEDED
     assert calls == ["step-1"]

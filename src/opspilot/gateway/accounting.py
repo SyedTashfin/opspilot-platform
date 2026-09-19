@@ -42,9 +42,7 @@ class ModelCallRecord:
     error: str | None = None
 
     @staticmethod
-    def from_response(
-        run_id: uuid.UUID, response: ModelResponse, step: str | None = None
-    ) -> ModelCallRecord:
+    def from_response(run_id: uuid.UUID, response: ModelResponse, step: str | None = None) -> ModelCallRecord:
         return ModelCallRecord(
             run_id=run_id,
             step=step or response.step,
@@ -153,8 +151,6 @@ class PostgresLedger:
 
     async def spent_in_run_eur(self, run_id: uuid.UUID) -> float:
         result = await self._session.execute(
-            sa.select(sa.func.coalesce(sa.func.sum(ModelCall.cost_eur), 0)).where(
-                ModelCall.run_id == run_id
-            )
+            sa.select(sa.func.coalesce(sa.func.sum(ModelCall.cost_eur), 0)).where(ModelCall.run_id == run_id)
         )
         return float(result.scalar_one())

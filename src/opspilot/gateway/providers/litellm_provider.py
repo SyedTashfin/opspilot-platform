@@ -73,18 +73,14 @@ class LiteLLMProvider:
     async def complete(self, model: str, request: ModelRequest) -> ProviderResult:
         try:
             import litellm
-        except (
-            ImportError
-        ) as exc:  # pragma: no cover - dependency is declared; guard is for clarity
+        except ImportError as exc:  # pragma: no cover - dependency is declared; guard is for clarity
             raise ProviderError("litellm is not installed; live providers are unavailable") from exc
 
         messages: list[dict[str, str]] = [
             {"role": message.role, "content": message.content} for message in request.messages
         ]
         if request.response_model is not None:
-            messages.append(
-                {"role": "system", "content": _schema_instruction(request.response_model)}
-            )
+            messages.append({"role": "system", "content": _schema_instruction(request.response_model)})
 
         kwargs: dict[str, Any] = {
             "model": model,
@@ -102,9 +98,7 @@ class LiteLLMProvider:
 
         text, usage = _extract(response)
         parsed = (
-            _parse_structured(request.response_model, text)
-            if request.response_model is not None
-            else None
+            _parse_structured(request.response_model, text) if request.response_model is not None else None
         )
         return ProviderResult(
             text=text,

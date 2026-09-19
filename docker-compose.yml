@@ -20,11 +20,28 @@ services:
     environment:
       OPSPILOT_ENVIRONMENT: local
       OPSPILOT_DATABASE_URL: postgresql+asyncpg://opspilot:opspilot@postgres:5432/opspilot
+      # Spans always go to PostgreSQL; OTLP is only used when a viewer is actually running.
+      OPSPILOT_OTEL_EXPORTER_OTLP_ENDPOINT: http://phoenix:6006
     ports:
       - "8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
 
+  # Optional trace viewer: `docker compose --profile observability up -d phoenix`.
+  # Not started by default: it is a viewer, and the platform must not depend on a viewer being up
+  # (ADR-006). Spans are readable from PostgreSQL without it.
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    profiles: ["observability"]
+    environment:
+      PHOENIX_WORKING_DIR: /data
+    ports:
+      - "6006:6006"   # UI and OTLP HTTP
+      - "4317:4317"   # OTLP gRPC
+    volumes:
+      - opspilot-phoenix:/data
+
 volumes:
   opspilot-pgdata:
+  opspilot-phoenix:

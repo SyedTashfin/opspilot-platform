@@ -50,12 +50,8 @@ def test_unknown_cost_is_stored_as_zero_but_flagged() -> None:
 
 async def test_recorder_totals_and_surfaces_unknown_cost_calls() -> None:
     recorder = InMemoryRecorder()
-    await recorder.record(
-        ModelCallRecord.from_response(uuid.uuid4(), _response(cost=0.5, known=True))
-    )
-    await recorder.record(
-        ModelCallRecord.from_response(uuid.uuid4(), _response(cost=None, known=False))
-    )
+    await recorder.record(ModelCallRecord.from_response(uuid.uuid4(), _response(cost=0.5, known=True)))
+    await recorder.record(ModelCallRecord.from_response(uuid.uuid4(), _response(cost=None, known=False)))
     assert recorder.total_eur() == 0.5
     assert len(recorder.unknown_cost_calls()) == 1
 

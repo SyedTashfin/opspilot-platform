@@ -66,9 +66,7 @@ class Agent(Base, TimestampMixin):
 
     __tablename__ = "agents"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        sa.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(sa.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(sa.String(120), unique=True, nullable=False)
     description: Mapped[str] = mapped_column(sa.Text, nullable=False, default="")
     status: Mapped[AgentStatus] = mapped_column(
@@ -86,9 +84,7 @@ class Run(Base):
     __tablename__ = "runs"
     __table_args__ = (sa.Index("ix_runs_agent_created", "agent_id", "created_at"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        sa.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(sa.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     agent_id: Mapped[uuid.UUID] = mapped_column(
         sa.ForeignKey("agents.id", ondelete="RESTRICT"), nullable=False
     )
@@ -103,9 +99,7 @@ class Run(Base):
     duration_ms: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
     input_tokens: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
     output_tokens: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
-    cost_eur: Mapped[float] = mapped_column(
-        sa.Numeric(12, 6), nullable=False, default=0, server_default="0"
-    )
+    cost_eur: Mapped[float] = mapped_column(sa.Numeric(12, 6), nullable=False, default=0, server_default="0")
     trace_id: Mapped[str | None] = mapped_column(sa.String(64), nullable=True)
     error: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -122,9 +116,7 @@ class RunStep(Base):
     __tablename__ = "run_steps"
     __table_args__ = (sa.UniqueConstraint("run_id", "step_index", name="uq_run_steps_run_id_step"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        sa.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(sa.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     run_id: Mapped[uuid.UUID] = mapped_column(
         sa.ForeignKey("runs.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -146,9 +138,7 @@ class ModelCall(Base):
     __tablename__ = "model_calls"
     __table_args__ = (sa.Index("ix_model_calls_step", "step"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        sa.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(sa.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     run_id: Mapped[uuid.UUID] = mapped_column(
         sa.ForeignKey("runs.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -162,13 +152,9 @@ class ModelCall(Base):
     request_id: Mapped[str | None] = mapped_column(sa.String(120), nullable=True)
     input_tokens: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
     output_tokens: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
-    cost_eur: Mapped[float] = mapped_column(
-        sa.Numeric(12, 6), nullable=False, default=0, server_default="0"
-    )
+    cost_eur: Mapped[float] = mapped_column(sa.Numeric(12, 6), nullable=False, default=0, server_default="0")
     latency_ms: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
-    status: Mapped[CallStatus] = mapped_column(
-        enum_column(CallStatus), nullable=False, default=CallStatus.OK
-    )
+    status: Mapped[CallStatus] = mapped_column(enum_column(CallStatus), nullable=False, default=CallStatus.OK)
     error: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
@@ -180,9 +166,7 @@ class Approval(Base):
 
     __tablename__ = "approvals"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        sa.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(sa.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     run_id: Mapped[uuid.UUID] = mapped_column(
         sa.ForeignKey("runs.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -205,9 +189,7 @@ class ToolCall(Base):
 
     __tablename__ = "tool_calls"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        sa.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(sa.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     run_id: Mapped[uuid.UUID] = mapped_column(
         sa.ForeignKey("runs.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -233,14 +215,41 @@ class ToolCall(Base):
     )
 
 
+class Span(Base):
+    """One OpenTelemetry span, persisted so a trace outlives the process that produced it.
+
+    Spans carry facts about what the platform did — step, model, provider, tokens, cost, tool name,
+    permission class, outcome status, hashes. They do not carry prompts, completions or reasoning.
+    """
+
+    __tablename__ = "spans"
+    __table_args__ = (sa.Index("ix_spans_trace_id", "trace_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(sa.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.ForeignKey("runs.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    trace_id: Mapped[str] = mapped_column(sa.String(32), nullable=False)
+    span_id: Mapped[str] = mapped_column(sa.String(16), nullable=False, unique=True)
+    parent_span_id: Mapped[str | None] = mapped_column(sa.String(16), nullable=True)
+    name: Mapped[str] = mapped_column(sa.String(128), nullable=False)
+    kind: Mapped[str] = mapped_column(sa.String(16), nullable=False, default="internal")
+    status: Mapped[str] = mapped_column(sa.String(32), nullable=False, default="ok")
+    started_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
+    ended_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False)
+    duration_ms: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
+    attributes: Mapped[dict[str, Any]] = mapped_column(JSONType, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+    )
+
+
 class AuditEvent(Base):
     """Append-only record; ``prev_hash``/``hash`` enable tamper-evidence in a later milestone."""
 
     __tablename__ = "audit_events"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        sa.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(sa.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     seq: Mapped[int] = mapped_column(sa.BigInteger, sa.Identity(), nullable=False, unique=True)
     at: Mapped[datetime] = mapped_column(
         sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False

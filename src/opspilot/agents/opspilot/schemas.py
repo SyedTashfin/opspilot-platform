@@ -77,9 +77,7 @@ class RemediationProposal(BaseModel):
     arguments: dict[str, Any] = Field(default_factory=dict)
     justification: str
     requires_approval: bool
-    status: Literal[
-        "not_required", "proposed", "waiting_approval", "executed", "rejected", "failed"
-    ]
+    status: Literal["not_required", "proposed", "waiting_approval", "executed", "rejected", "failed"]
     arguments_hash: str | None = None
     detail: dict[str, Any] = Field(default_factory=dict)
 

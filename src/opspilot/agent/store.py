@@ -9,7 +9,7 @@ source of truth for spend.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Protocol, cast
@@ -18,8 +18,9 @@ import sqlalchemy as sa
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from opspilot.db.models import Agent, ModelCall, Run, RunStep
+from opspilot.db.models import Agent, ModelCall, Run, RunStep, Span
 from opspilot.domain.enums import AgentStatus, RunStatus, StepStatus
+from opspilot.observability.spans import SpanRecord
 
 
 class UnknownAgentError(Exception):
@@ -69,6 +70,12 @@ class RunStore(Protocol):
 
     async def steps(self, run_id: uuid.UUID) -> list[StepRecord]: ...
 
+    async def attach_trace(self, *, run_id: uuid.UUID, trace_id: str) -> None:
+        """Record which trace the run belongs to, so its spans can be found later."""
+        ...
+
+    async def record_spans(self, *, run_id: uuid.UUID, spans: Sequence[SpanRecord]) -> None: ...
+
 
 @dataclass
 class InMemoryRunStore:
@@ -77,6 +84,7 @@ class InMemoryRunStore:
     agents: dict[str, uuid.UUID] = field(default_factory=dict)
     runs: dict[uuid.UUID, dict[str, Any]] = field(default_factory=dict)
     records: dict[uuid.UUID, list[StepRecord]] = field(default_factory=dict)
+    spans: dict[uuid.UUID, list[SpanRecord]] = field(default_factory=dict)
 
     def register_agent(self, name: str) -> uuid.UUID:
         agent_id = uuid.uuid4()
@@ -143,6 +151,12 @@ class InMemoryRunStore:
 
     async def steps(self, run_id: uuid.UUID) -> list[StepRecord]:
         return list(self.records.get(run_id, []))
+
+    async def attach_trace(self, *, run_id: uuid.UUID, trace_id: str) -> None:
+        self.runs[run_id]["trace_id"] = trace_id
+
+    async def record_spans(self, *, run_id: uuid.UUID, spans: Sequence[SpanRecord]) -> None:
+        self.spans.setdefault(run_id, []).extend(spans)
 
     def status_of(self, run_id: uuid.UUID) -> RunStatus:
         return cast(RunStatus, self.runs[run_id]["status"])
@@ -255,6 +269,19 @@ class PostgresRunStore:
             )
             for step in result.scalars().all()
         ]
+
+    async def attach_trace(self, *, run_id: uuid.UUID, trace_id: str) -> None:
+        run = await self._session.get(Run, run_id)
+        if run is None:  # pragma: no cover
+            raise UnknownAgentError(f"run {run_id} vanished")
+        run.trace_id = trace_id
+        await self._session.flush()
+
+    async def record_spans(self, *, run_id: uuid.UUID, spans: Sequence[SpanRecord]) -> None:
+        for record in spans:
+            self._session.add(Span(**record.as_row(run_id)))
+        if spans:
+            await self._session.flush()
 
 
 class AgentSeed(BaseModel):

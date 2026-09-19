@@ -133,12 +133,8 @@ def alert() -> IncidentAlert:
 
 
 async def run_pipeline(harness: Harness) -> tuple[Any, list[Any]]:
-    steps = investigation_steps(
-        gateway=harness.gateway, executor=harness.executor, runbooks=harness.runbooks
-    )
-    summary = await harness.runtime.execute(
-        agent="opspilot", request=alert().model_dump(), steps=steps
-    )
+    steps = investigation_steps(gateway=harness.gateway, executor=harness.executor, runbooks=harness.runbooks)
+    summary = await harness.runtime.execute(agent="opspilot", request=alert().model_dump(), steps=steps)
     return summary, await harness.store.steps(summary.run_id)
 
 
@@ -196,10 +192,7 @@ async def test_step_trace_never_contains_the_ground_truth() -> None:
 
     _, records = await run_pipeline(harness)
     serialized = json.dumps(
-        [
-            {"name": record.name, "summary": record.summary, "detail": record.detail}
-            for record in records
-        ]
+        [{"name": record.name, "summary": record.summary, "detail": record.detail} for record in records]
     )
 
     assert SCENARIO.root_cause not in serialized
@@ -276,9 +269,7 @@ async def test_a_run_that_suspends_records_the_proposal_as_data() -> None:
 
 
 async def test_a_tool_outside_the_allowlist_is_refused_before_it_is_called() -> None:
-    provider = terminating_provider(
-        "shell.exec", {"command": "rm -rf /"}, ["ev-logs", "ev-deployments"]
-    )
+    provider = terminating_provider("shell.exec", {"command": "rm -rf /"}, ["ev-logs", "ev-deployments"])
     harness = build_harness(provider)
 
     summary, records = await run_pipeline(harness)

@@ -21,9 +21,7 @@ from opspilot.tools.types import ToolContext, ToolDefinition
 class LogQueryArgs(BaseModel):
     service: str = Field(description="Service name, for example recommendation-service")
     window_minutes: int = Field(default=30, ge=1, le=180, description="Lookback window")
-    level: Literal["INFO", "WARN", "ERROR"] | None = Field(
-        default=None, description="Filter by level"
-    )
+    level: Literal["INFO", "WARN", "ERROR"] | None = Field(default=None, description="Filter by level")
     contains: str | None = Field(default=None, description="Substring match, case-insensitive")
     limit: int = Field(default=50, ge=1, le=200)
 
@@ -45,9 +43,7 @@ class LogQueryResult(BaseModel):
 class MetricsArgs(BaseModel):
     service: str
     window_minutes: int = Field(default=30, ge=1, le=180)
-    metrics: list[str] | None = Field(
-        default=None, description="Optional subset of metric names to return"
-    )
+    metrics: list[str] | None = Field(default=None, description="Optional subset of metric names to return")
 
 
 class MetricSummary(BaseModel):
@@ -123,17 +119,13 @@ def telemetry_tools(source: TelemetrySource) -> list[ToolDefinition]:
             service=arguments.service,
             window_minutes=arguments.window_minutes,
             lines=[
-                LogLineModel(
-                    at=line.at, level=line.level, message=line.message, attributes=line.attributes
-                )
+                LogLineModel(at=line.at, level=line.level, message=line.message, attributes=line.attributes)
                 for line in lines
             ],
             source=source.label,
         )
 
-    async def get_recent_deployments(
-        arguments: DeploymentsArgs, context: ToolContext
-    ) -> DeploymentsResult:
+    async def get_recent_deployments(arguments: DeploymentsArgs, context: ToolContext) -> DeploymentsResult:
         deployments = await source.deployments(arguments.service, limit=arguments.limit)
         return DeploymentsResult(
             service=arguments.service,
@@ -149,9 +141,7 @@ def telemetry_tools(source: TelemetrySource) -> list[ToolDefinition]:
             source=source.label,
         )
 
-    async def get_resource_state(
-        arguments: ResourceStateArgs, context: ToolContext
-    ) -> ResourceStateResult:
+    async def get_resource_state(arguments: ResourceStateArgs, context: ToolContext) -> ResourceStateResult:
         state = await source.resource_state(arguments.service)
         return ResourceStateResult(
             service=state.service,
@@ -176,9 +166,7 @@ def telemetry_tools(source: TelemetrySource) -> list[ToolDefinition]:
         ),
         ToolDefinition(
             name="azure.query_logs",
-            description=(
-                "Search a service's logs over a lookback window, optionally by level or text."
-            ),
+            description=("Search a service's logs over a lookback window, optionally by level or text."),
             handler=query_logs,
             input_model=LogQueryArgs,
             output_model=LogQueryResult,

@@ -75,8 +75,7 @@ class ClassifyStep:
             raise TypeError(msg)
         state.put("classification", classification)
         return StepResult.succeeded(
-            f"classified as {classification.incident_class} "
-            f"at confidence {classification.confidence:.2f}",
+            f"classified as {classification.incident_class} at confidence {classification.confidence:.2f}",
             incident_class=classification.incident_class,
             confidence=classification.confidence,
             model=response.model,
@@ -109,8 +108,7 @@ class ToolStep:
         output = outcome.output
         if not isinstance(output, self.output_model):
             return StepResult.failed(
-                f"{self.tool} returned {type(output).__name__}, "
-                f"expected {self.output_model.__name__}",
+                f"{self.tool} returned {type(output).__name__}, expected {self.output_model.__name__}",
                 tool=self.tool,
             )
         state.put(self.state_key, output)
@@ -286,9 +284,7 @@ def assemble_evidence(state: RunState) -> list[EvidenceItem]:
     metrics: MetricsResult | None = state.get("metrics")
     if metrics is not None:
         ranked = sorted(metrics.series.items(), key=lambda row: row[1].max, reverse=True)
-        headline = ", ".join(
-            f"{name} p95={summary.p95}{summary.unit}" for name, summary in ranked[:3]
-        )
+        headline = ", ".join(f"{name} p95={summary.p95}{summary.unit}" for name, summary in ranked[:3])
         items.append(
             EvidenceItem(
                 evidence_id="ev-metrics",
@@ -389,8 +385,7 @@ def build_report(state: RunState) -> InvestigationReport:
     notes = []
     if diagnosis.unsupported_evidence_ids:
         notes.append(
-            "the model cited evidence ids that do not exist: "
-            + ", ".join(diagnosis.unsupported_evidence_ids)
+            "the model cited evidence ids that do not exist: " + ", ".join(diagnosis.unsupported_evidence_ids)
         )
     if diagnosis.grounding_ratio < 1.0 and diagnosis.evidence_ids:
         notes.append(f"grounding ratio {diagnosis.grounding_ratio:.2f}")
@@ -505,8 +500,7 @@ def investigation_steps(
             state_key="runbook_search",
             arguments=runbook_query,
             summarise=lambda output: (
-                f"{len(output.chunks)} runbook chunks retrieved "
-                f"from {output.indexed_chunks} indexed"
+                f"{len(output.chunks)} runbook chunks retrieved from {output.indexed_chunks} indexed"
             ),
         ),
         _RunbookSelectionStep(runbooks=runbooks),
@@ -535,9 +529,7 @@ class _RunbookSelectionStep:
     async def run(self, state: RunState) -> StepResult:
         search: RunbookSearchResult = state.require("runbook_search")
         mapping = {chunk.citation_id: chunk for chunk in self.runbooks.chunks}
-        chunks = [
-            mapping[result.citation_id] for result in search.chunks if result.citation_id in mapping
-        ]
+        chunks = [mapping[result.citation_id] for result in search.chunks if result.citation_id in mapping]
         state.put("runbook_chunks", chunks)
         return StepResult.succeeded(
             f"{len(chunks)} runbook chunks selected for the diagnosis prompt",

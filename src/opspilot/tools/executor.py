@@ -29,9 +29,10 @@ from pydantic import BaseModel, ValidationError
 
 from opspilot.domain.enums import CallStatus, PermissionClass
 from opspilot.observability.logging import get_logger
+from opspilot.observability.tracing import record_error, set_attributes, span
 from opspilot.tools.audit import AuditEvent, AuditRecorder
 from opspilot.tools.registry import ToolRegistry
-from opspilot.tools.types import ToolContext, ToolOutcome, arguments_hash
+from opspilot.tools.types import ToolContext, ToolDefinition, ToolOutcome, arguments_hash
 
 logger = get_logger(__name__)
 
@@ -100,31 +101,31 @@ class ToolExecutor:
             )
 
         started = self.clock()
-        try:
-            output = await asyncio.wait_for(
-                definition.handler(parsed, context), timeout=definition.timeout_seconds
+        with span(
+            "tool.execute",
+            {
+                "tool.name": name,
+                "tool.permission_class": definition.permission_class.value,
+                "tool.risk_level": definition.risk_level.value,
+                "tool.arguments_hash": digest,
+                "run.id": str(context.run_id) if context.run_id else "",
+            },
+        ) as tool_span:
+            output, failure = await self._invoke(definition, parsed, context)
+            latency_ms = int((self.clock() - started) * 1000)
+            # Set on the span before it closes: a finished span ignores further attributes.
+            set_attributes(
+                tool_span,
+                {
+                    "tool.status": failure[0].value if failure is not None else CallStatus.OK.value,
+                    "tool.latency_ms": latency_ms,
+                },
             )
-        except TimeoutError:
-            return await self._refuse(
-                context,
-                name,
-                CallStatus.TIMEOUT,
-                raw_arguments,
-                digest,
-                f"exceeded the {definition.timeout_seconds}s timeout",
-            )
-        except Exception as exc:
-            logger.warning("tool.handler_failed", tool=name, error=str(exc))
-            return await self._refuse(
-                context,
-                name,
-                CallStatus.ERROR,
-                raw_arguments,
-                digest,
-                f"handler raised {type(exc).__name__}: {exc}",
-            )
+            if failure is not None:
+                record_error(tool_span, failure[1], failure[0].value)
 
-        latency_ms = int((self.clock() - started) * 1000)
+        if failure is not None:
+            return await self._refuse(context, name, failure[0], raw_arguments, digest, failure[1])
         output_error = self._validate_output(definition.output_model, output)
         status = CallStatus.OK if output_error is None else CallStatus.ERROR
 
@@ -161,6 +162,24 @@ class ToolExecutor:
             run_id=str(context.run_id) if context.run_id else None,
         )
         return outcome
+
+    async def _invoke(
+        self, definition: ToolDefinition, parsed: BaseModel, context: ToolContext
+    ) -> tuple[BaseModel | None, tuple[CallStatus, str] | None]:
+        """Run the handler under its own timeout, returning either an output or a refusal."""
+        try:
+            output = await asyncio.wait_for(
+                definition.handler(parsed, context), timeout=definition.timeout_seconds
+            )
+        except TimeoutError:
+            return None, (
+                CallStatus.TIMEOUT,
+                f"exceeded the {definition.timeout_seconds}s timeout",
+            )
+        except Exception as exc:
+            logger.warning("tool.handler_failed", tool=definition.name, error=str(exc))
+            return None, (CallStatus.ERROR, f"handler raised {type(exc).__name__}: {exc}")
+        return output, None
 
     async def _permission_gate(
         self,
@@ -207,9 +226,7 @@ class ToolExecutor:
         except ValidationError as exc:
             return None, f"arguments do not match {model.__name__}: {exc.error_count()} errors"
 
-    def _validate_output(
-        self, model: type[BaseModel] | None, output: BaseModel | None
-    ) -> str | None:
+    def _validate_output(self, model: type[BaseModel] | None, output: BaseModel | None) -> str | None:
         if model is None:
             return None
         if output is None:

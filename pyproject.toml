@@ -15,6 +15,9 @@ dependencies = [
   "alembic>=1.14",
   "structlog>=24.4",
   "litellm>=1.55",
+  "opentelemetry-api>=1.28",
+  "opentelemetry-sdk>=1.28",
+  "opentelemetry-exporter-otlp-proto-http>=1.28",
 ]
 
 [build-system]
@@ -35,7 +38,9 @@ dev = [
 ]
 
 [tool.ruff]
-line-length = 100
+# 110 rather than the usual 100: the codebase is comment- and docstring-heavy on purpose, and reflowing
+# prose to satisfy a 10-column difference is churn with no engineering value. Code is still wrapped.
+line-length = 110
 target-version = "py312"
 src = ["src", "tests", "migrations"]
 

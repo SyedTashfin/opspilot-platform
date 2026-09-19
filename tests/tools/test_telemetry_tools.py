@@ -44,9 +44,7 @@ async def test_read_only_telemetry_tools_execute_without_approval(harness) -> No
 
     metrics = await executor.execute("azure.get_metrics", {"service": SERVICE}, CONTEXT)
     logs = await executor.execute("azure.query_logs", {"service": SERVICE, "limit": 5}, CONTEXT)
-    deployments = await executor.execute(
-        "github.get_recent_deployments", {"service": SERVICE}, CONTEXT
-    )
+    deployments = await executor.execute("github.get_recent_deployments", {"service": SERVICE}, CONTEXT)
     resource = await executor.execute("azure.get_resource_state", {"service": SERVICE}, CONTEXT)
 
     assert metrics.status is CallStatus.OK

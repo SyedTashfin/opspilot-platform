@@ -26,9 +26,7 @@ def test_cost_is_unknown_rather_than_zero_when_unpriced() -> None:
 
 
 def test_cost_math_per_million_tokens() -> None:
-    amount, known = cost_eur(
-        "deepseek/deepseek-chat", Usage(input_tokens=1_000_000, output_tokens=1_000_000)
-    )
+    amount, known = cost_eur("deepseek/deepseek-chat", Usage(input_tokens=1_000_000, output_tokens=1_000_000))
     assert known is True
     assert amount == 1.25  # 0.25 input + 1.00 output
 

@@ -59,7 +59,6 @@ def cost_eur(model: str, usage: Usage) -> tuple[float | None, bool]:
     if price is None:
         return None, False
     amount = (
-        usage.input_tokens * price.input_per_million_eur
-        + usage.output_tokens * price.output_per_million_eur
+        usage.input_tokens * price.input_per_million_eur + usage.output_tokens * price.output_per_million_eur
     ) / 1_000_000
     return round(amount, 6), True

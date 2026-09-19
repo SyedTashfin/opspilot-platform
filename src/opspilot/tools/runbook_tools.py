@@ -35,9 +35,7 @@ class RunbookSearchResult(BaseModel):
 
 
 def runbook_tools(index: RunbookIndex) -> list[ToolDefinition]:
-    async def search_runbook(
-        arguments: RunbookSearchArgs, context: ToolContext
-    ) -> RunbookSearchResult:
+    async def search_runbook(arguments: RunbookSearchArgs, context: ToolContext) -> RunbookSearchResult:
         chunks = index.search(arguments.query, limit=arguments.limit)
         return RunbookSearchResult(
             query=arguments.query,

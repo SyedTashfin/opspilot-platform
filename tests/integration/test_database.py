@@ -36,9 +36,7 @@ async def test_schema_roundtrip_and_run_lifecycle(live_engine: AsyncEngine) -> N
         await session.flush()
 
         session.add(models.ModelCall(run_id=run.id, provider="fake", model="fake-1"))
-        session.add(
-            models.RunStep(run_id=run.id, step_index=0, name="classify", status="succeeded")
-        )
+        session.add(models.RunStep(run_id=run.id, step_index=0, name="classify", status="succeeded"))
         await session.commit()
 
         stored = await session.get(models.Run, run.id)
@@ -47,11 +45,7 @@ async def test_schema_roundtrip_and_run_lifecycle(live_engine: AsyncEngine) -> N
         assert stored.cost_eur == 0
 
         calls = (
-            (
-                await session.execute(
-                    sa.select(models.ModelCall).where(models.ModelCall.run_id == run.id)
-                )
-            )
+            (await session.execute(sa.select(models.ModelCall).where(models.ModelCall.run_id == run.id)))
             .scalars()
             .all()
         )

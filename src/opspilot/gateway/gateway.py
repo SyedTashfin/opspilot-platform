@@ -39,6 +39,7 @@ from opspilot.gateway.pricing import cost_eur
 from opspilot.gateway.providers.base import ModelProvider
 from opspilot.gateway.types import ModelRequest, ModelResponse, ProviderResult
 from opspilot.observability.logging import get_logger
+from opspilot.observability.tracing import record_error, set_attributes, span
 
 logger = get_logger(__name__)
 
@@ -66,6 +67,43 @@ class ModelGateway:
     clock: Callable[[], float] = field(default=time.perf_counter)
 
     async def complete(self, request: ModelRequest, run_id: uuid.UUID) -> ModelResponse:
+        """Public entry point: one span per model request, carrying the outcome as attributes.
+
+        The span records what the platform did — step, model, provider, tokens, cost, attempts, whether
+        a fallback was used, latency — and never the prompt or the completion.
+        """
+        with span("gateway.complete", {"llm.step": request.step, "run.id": str(run_id)}) as call_span:
+            try:
+                response = await self._complete(request, run_id)
+            except Exception as exc:
+                record_error(call_span, str(exc), type(exc).__name__)
+                raise
+            # cost_eur is None when the model has no price on file. Record the cost only when it is
+            # known: writing 0.0 would put a plausible zero in the trace, which is the one thing the
+            # pricing table exists to avoid.
+            cost_attributes = (
+                {"llm.cost_eur": float(response.cost_eur)}
+                if response.cost_known and response.cost_eur is not None
+                else {}
+            )
+            set_attributes(
+                call_span,
+                {
+                    "llm.model": response.model,
+                    "llm.provider": response.provider,
+                    "llm.request_id": response.request_id,
+                    "llm.input_tokens": response.usage.input_tokens,
+                    "llm.output_tokens": response.usage.output_tokens,
+                    "llm.cost_known": response.cost_known,
+                    **cost_attributes,
+                    "llm.attempts": response.attempts,
+                    "llm.fallback_used": response.fallback_used,
+                    "llm.latency_ms": response.latency_ms,
+                },
+            )
+            return response
+
+    async def _complete(self, request: ModelRequest, run_id: uuid.UUID) -> ModelResponse:
         await self._enforce_budget(run_id)
         chain = self.config.policy.chain_for(request.step)
         request_id = uuid.uuid4().hex
@@ -142,9 +180,7 @@ class ModelGateway:
                     provider.complete(model, request), timeout=self.config.timeout_seconds
                 )
             except TimeoutError:
-                last_error = ProviderTimeout(
-                    f"{model} exceeded the {self.config.timeout_seconds}s timeout"
-                )
+                last_error = ProviderTimeout(f"{model} exceeded the {self.config.timeout_seconds}s timeout")
             except NON_RETRYABLE:
                 raise
             except GatewayError as exc:
@@ -212,9 +248,7 @@ class ModelGateway:
             step=request.step,
         )
 
-    async def record_success(
-        self, response: ModelResponse, run_id: uuid.UUID, request: ModelRequest
-    ) -> None:
+    async def record_success(self, response: ModelResponse, run_id: uuid.UUID, request: ModelRequest) -> None:
         await self.recorder.record(ModelCallRecord.from_response(run_id, response, request.step))
         logger.info(
             "gateway.call.finish",

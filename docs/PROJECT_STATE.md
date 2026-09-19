@@ -1,27 +1,29 @@
 # Project state
 
-Last updated: 2026-09-19 (end of M4).
+Last updated: 2026-09-19 (end of M5).
 
 ## Current milestone
 
-**M0 (research and architecture), M1 (local skeleton), M2 (model gateway), M3 (tool registry,
-permissions, audit) and M4 (agent runtime, OpsPilot pipeline) complete.**
+**M0–M4 complete** (research and architecture, local skeleton, model gateway, tool registry and audit,
+agent runtime and OpsPilot pipeline) **and M5 (observability and platform metrics) complete.**
 
 Verification, all run locally on 2026-09-19 against the real stack:
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Formatting | `uv run ruff format --check src tests migrations` | 75 files already formatted |
+| Formatting | `uv run ruff format --check src tests migrations` | 85 files already formatted |
 | Lint | `uv run ruff check src tests migrations` | all checks passed |
-| Types | `uv run mypy src` | no issues in 51 source files |
-| Tests | `uv run pytest` | **139 passed, 1 deselected** (live marker), 5 of them against live PostgreSQL |
-| Migration (live) | `uv run alembic upgrade head` | `0002_model_call_step` applied to PostgreSQL 16 |
+| Types | `uv run mypy src` | no issues in 56 source files |
+| Tests | `uv run pytest` | **166 passed, 1 deselected** (live marker), 9 of them against live PostgreSQL |
+| Migration (live) | `uv run alembic upgrade head` | `0003_spans` applied to PostgreSQL 16; `spans` table confirmed |
+| Trace read-back | `tests/integration/test_spans_and_metrics.py` | spans round-trip through PostgreSQL; the overview aggregates rows the test inserted and can count by hand |
 | Demo run | `uv run pytest tests/agents -q` | 11-step investigation on the deterministic provider, reproducible |
 | Live model call | `uv run pytest -m live -s` | **not run** — no provider key configured yet |
 
-One cosmetic `SAWarning` (a pooled connection collected by the garbage collector) still appears in the
-test summary. It is a test-harness artefact, not a leak in the application: the app disposes its engine
-in the FastAPI lifespan, and the warning does not appear when the lifespan runs.
+The `SAWarning` about a connection collected by the garbage collector is gone: it was pointing at a real
+bug in a test that read through a session after its context had closed. The integration fixtures now set
+`lock_timeout` before dropping the schema, so a test that leaves a transaction open fails in five seconds
+instead of blocking the suite.
 
 
 ## Architecture (settled)
@@ -156,11 +158,44 @@ Full rationale and rejected alternatives: `docs/DECISIONS.md`.
 - Tests: 51 new (runtime budgets and containment, telemetry determinism and ground-truth non-leakage,
   retrieval ranking and citation stability, tool governance, and the pipeline end to end).
 
+### M5 — observability and platform metrics (complete)
+
+- `opspilot.observability.spans` holds span *data* and the in-process buffer, with no OpenTelemetry
+  import: the run store can persist a span and a test can build one without a tracing stack.
+- `opspilot.observability.tracing` is the OTel adapter: one tracer provider per process, always feeding
+  the buffer, plus an OTLP export when `OPSPILOT_OTEL_EXPORTER_OTLP_ENDPOINT` is set. With no provider
+  configured the OTel API returns non-recording spans, so instrumented code runs unchanged in CI.
+- **Instrumented at three levels, with parent/child structure asserted in tests**: `agent.run` wraps the
+  whole run, `agent.step.<name>` wraps each step, and `gateway.complete` and `tool.execute` nest under
+  the step that made the call. A run that ends for any reason other than success is an error span; a run
+  suspended for approval is not, because waiting for a human is the system working.
+- A span carries facts: step, model, provider, tokens, cost *and whether the cost is known*, latency,
+  attempts, fallback flag, tool name, permission class, risk level, outcome status and argument hash. It
+  never carries prompts or completions — a test passes a sentinel prompt through the gateway and asserts
+  it appears in no span, and another asserts every attribute stays a JSON scalar.
+- `spans` table plus migration `0003_spans`, indexed on `trace_id` and `run_id`, cascading from `runs`.
+  Spans are drained for the run's own trace when the run ends and written in the run's session (ADR-020).
+- `opspilot.observability.metrics` is a pure function from database facts to the dashboard payload, and
+  **every figure carries `source: measured` and a `basis` string naming the query** (ADR-012). Success
+  rate counts only finished runs; percentiles are nearest-rank so a p95 is always a value that was
+  actually observed; an empty input is 0, never undefined. `data_sources` states where the telemetry
+  behind the runs came from (`demo` today), so no number can pass for live infrastructure data.
+- `POST`-free read endpoints: `/api/v1/platform/overview` and `/api/v1/runs/{id}/trace`. Dependencies are
+  FastAPI dependencies, so the contract is tested without a database and the SQL is tested against a real
+  one — where the aggregate test inserts known rows and counts them by hand.
+- Phoenix is available behind `docker compose --profile observability up -d phoenix` and is never a
+  dependency: spans are readable from PostgreSQL without it (ADR-006).
+- Tests: 27 new (metric aggregation and provenance, span structure and non-leakage, the two endpoints),
+  plus 3 integration tests against live PostgreSQL.
+
 ## Active work
 
-M5 — observability: an OpenTelemetry span around every step, model call and tool execution, persisted
-to PostgreSQL and viewable in Phoenix, plus the platform metrics the dashboard reads — all labelled
-`measured`, `seeded` or `simulated` so no number is presentable without its provenance.
+M6 — the Incident Lab: a `demo-service` container with a control API that injects faults in process
+(latency, 5xx, resource exhaustion, dependency failure), scenarios whose ground truth is withheld from
+the agent, and an HTTP `TelemetrySource` that replaces the synthetic one without touching a pipeline
+step — which is the point of the tool factories built in M4.
+
+## Active work
 
 ## Outstanding work (planned milestones)
 
@@ -196,7 +231,12 @@ to PostgreSQL and viewable in Phoenix, plus the platform metrics the dashboard r
    summary or tool output contains either.
 6. **Retrieval is lexical** (ADR-017). Paraphrased symptoms may not match a runbook; this is expected to
    be the most likely weak point and is the first thing M7 should measure.
-7. **Cost attribution is per step but not per tool call** — tool latency is recorded, tool spend is not
+7. **No live model has answered yet.** Every number in the overview is measured, but from a
+   deterministic provider; the first real call is still pending a provider key, and the live smoke test
+   is excluded from the default run and from CI.
+8. **Telemetry is synthetic** until M6 ships the incident lab. The overview says so
+   (`data_sources: ["demo", "postgres"]`), which is why the label exists.
+9. **Cost attribution is per step but not per tool call** — tool latency is recorded, tool spend is not
    a concept (no tool in M4 costs money).
 
 ## Important commands
@@ -209,6 +249,9 @@ uv run uvicorn opspilot.api.main:app --reload --port 8000
 
 # evaluation suite, deterministic provider (no tokens spent)
 uv run python -m opspilot.evals run --dataset scenarios/ --provider fake
+
+# trace viewer (optional, never a dependency)
+docker compose --profile observability up -d phoenix   # http://localhost:6006
 
 # Azure context (requires the IPv4 wrapper on this machine)
 az account show --subscription dc0945fe-6315-46cd-a5f3-fd89a39d66dd

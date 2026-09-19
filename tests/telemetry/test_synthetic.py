@@ -53,9 +53,7 @@ async def test_metric_generation_is_deterministic() -> None:
     assert first == second
     assert first.source == "demo"
     assert first.window_minutes == 30
-    assert {series.name for series in first.series} == {
-        profile.name for profile in SCENARIO.metrics
-    }
+    assert {series.name for series in first.series} == {profile.name for profile in SCENARIO.metrics}
 
 
 async def test_the_injected_fault_is_visible_in_the_metrics_it_should_move() -> None:

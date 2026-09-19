@@ -150,22 +150,20 @@ async def test_resumable_steps_survive_a_new_session(live_engine) -> None:
     async with factory() as fresh_session:
         second = PostgresRunStore(fresh_session)
         records = await second.steps(run_id)
-
-    assert [record.status for record in records] == [
-        StepStatus.SUCCEEDED,
-        StepStatus.WAITING_APPROVAL,
-    ]
-    stored = await second.steps(run_id)
-    assert stored[1].detail == {"remediation": {"status": "waiting_approval"}}
+        # Read inside the session: a session used after its context exits is a bug the warning below
+        # used to hide.
+        assert [record.status for record in records] == [
+            StepStatus.SUCCEEDED,
+            StepStatus.WAITING_APPROVAL,
+        ]
+        assert records[1].detail == {"remediation": {"status": "waiting_approval"}}
 
     async with factory() as check_session:
         run = await check_session.get(models.Run, run_id)
         assert run is not None and run.status is RunStatus.WAITING_APPROVAL
         waiting = (
             await check_session.execute(
-                sa.select(sa.func.count())
-                .select_from(models.RunStep)
-                .where(models.RunStep.run_id == run_id)
+                sa.select(sa.func.count()).select_from(models.RunStep).where(models.RunStep.run_id == run_id)
             )
         ).scalar_one()
         assert waiting == 2

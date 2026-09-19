@@ -151,10 +151,7 @@ class RunbookIndex:
         return score
 
     def search(self, query: str, *, limit: int = 3, min_score: float = 0.0) -> list[RunbookChunk]:
-        scored = [
-            (self.score(query, chunk, index), index, chunk)
-            for index, chunk in enumerate(self.chunks)
-        ]
+        scored = [(self.score(query, chunk, index), index, chunk) for index, chunk in enumerate(self.chunks)]
         scored = [row for row in scored if row[0] > min_score]
         # Deterministic ordering: score descending, then citation id, so ties never reorder
         # run to run.

@@ -206,6 +206,19 @@ recorded it, rather than being baked into a report written before the action exi
 run that suspends leaves the report and the refusal both readable in the trace, and resumption is
 index-based, so the suspended step is the one that re-runs.
 
+## ADR-020 — A run's spans are persisted by the run store when the run ends
+
+Status: accepted 2026-09-19.
+
+Spans are buffered in process and drained for the run's own trace when the run finishes, then written in
+the run's session. Rejected: a span processor writing to PostgreSQL from its callback (a second writer,
+a second connection and a second failure mode, mid-run), and a process-wide exporter queue with its own
+thread (spans for a failed run can be lost, which is exactly when they matter). Consequence: a run's
+trace is written even when the run fails, because the drain sits on the same path that finishes the run.
+Spans carry facts — step, model, provider, tokens, cost and whether the cost is known, tool name,
+permission class, risk level, outcome status, argument hash — and never prompts, completions or private
+reasoning, because a trace is readable by anyone with dashboard access.
+
 ## ADR-019 — Fixed pipeline order, runtime-owned budgets
 
 Status: accepted 2026-09-19.

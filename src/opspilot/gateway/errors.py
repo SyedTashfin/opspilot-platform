@@ -42,6 +42,4 @@ class BudgetExceeded(GatewayError):
         self.scope = scope
         self.limit_eur = limit_eur
         self.spent_eur = spent_eur
-        super().__init__(
-            f"{scope} budget exceeded: spent {spent_eur:.4f} EUR of {limit_eur:.4f} EUR"
-        )
+        super().__init__(f"{scope} budget exceeded: spent {spent_eur:.4f} EUR of {limit_eur:.4f} EUR")

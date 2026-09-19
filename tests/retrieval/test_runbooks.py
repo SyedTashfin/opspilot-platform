@@ -25,12 +25,8 @@ def test_chunks_carry_a_citable_identity_and_a_content_hash() -> None:
 def test_indexing_is_deterministic() -> None:
     first = load_runbooks(RUNBOOK_DIR)
     second = load_runbooks(RUNBOOK_DIR)
-    assert [chunk.citation_id for chunk in first.chunks] == [
-        chunk.citation_id for chunk in second.chunks
-    ]
-    assert [chunk.content_hash for chunk in first.chunks] == [
-        chunk.content_hash for chunk in second.chunks
-    ]
+    assert [chunk.citation_id for chunk in first.chunks] == [chunk.citation_id for chunk in second.chunks]
+    assert [chunk.content_hash for chunk in first.chunks] == [chunk.content_hash for chunk in second.chunks]
 
 
 def test_a_slow_dependency_symptom_finds_the_dependency_runbook() -> None:

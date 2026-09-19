@@ -17,6 +17,7 @@ EXPECTED_TABLES = {
     "tool_calls",
     "approvals",
     "audit_events",
+    "spans",
 }
 
 
@@ -26,19 +27,13 @@ def test_expected_tables_are_registered() -> None:
 
 @pytest.mark.parametrize("table_name", sorted(EXPECTED_TABLES))
 def test_schema_compiles_as_postgres_ddl(table_name: str) -> None:
-    ddl = str(
-        sa.schema.CreateTable(Base.metadata.tables[table_name]).compile(
-            dialect=postgresql.dialect()
-        )
-    )
+    ddl = str(sa.schema.CreateTable(Base.metadata.tables[table_name]).compile(dialect=postgresql.dialect()))
     assert ddl.strip().startswith("CREATE TABLE")
     assert table_name in ddl
 
 
 def test_json_columns_become_jsonb_on_postgres() -> None:
-    ddl = str(
-        sa.schema.CreateTable(Base.metadata.tables["agents"]).compile(dialect=postgresql.dialect())
-    )
+    ddl = str(sa.schema.CreateTable(Base.metadata.tables["agents"]).compile(dialect=postgresql.dialect()))
     assert "JSONB" in ddl
 
 
@@ -66,6 +61,13 @@ def test_money_and_tokens_are_numeric_and_integer() -> None:
 def test_audit_events_are_append_only_ready() -> None:
     audit = Base.metadata.tables["audit_events"]
     assert {"seq", "prev_hash", "hash", "actor", "action", "payload"} <= set(audit.c.keys())
+
+
+def test_spans_are_indexed_for_trace_reads() -> None:
+    spans = Base.metadata.tables["spans"]
+    indexed = {column.name for index in spans.indexes for column in index.columns}
+    assert {"trace_id", "run_id"} <= indexed
+    assert spans.c.span_id.unique is True
 
 
 def test_every_foreign_key_has_an_explicit_name() -> None:

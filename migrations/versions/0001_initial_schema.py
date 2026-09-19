@@ -88,9 +88,7 @@ def upgrade() -> None:
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("duration_ms", sa.Integer(), nullable=True),
-        sa.ForeignKeyConstraint(
-            ["run_id"], ["runs.id"], name="fk_run_steps_run_id_runs", ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["run_id"], ["runs.id"], name="fk_run_steps_run_id_runs", ondelete="CASCADE"),
         sa.UniqueConstraint("run_id", "step_index", name="uq_run_steps_run_id_step"),
     )
     op.create_index("ix_run_steps_run_id", "run_steps", ["run_id"])
@@ -127,9 +125,7 @@ def upgrade() -> None:
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("decided_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("decided_by", sa.String(length=120), nullable=True),
-        sa.ForeignKeyConstraint(
-            ["run_id"], ["runs.id"], name="fk_approvals_run_id_runs", ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["run_id"], ["runs.id"], name="fk_approvals_run_id_runs", ondelete="CASCADE"),
         sa.UniqueConstraint("token", name="uq_approvals_token"),
     )
     op.create_index("ix_approvals_run_id", "approvals", ["run_id"])

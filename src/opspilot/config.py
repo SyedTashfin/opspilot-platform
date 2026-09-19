@@ -14,9 +14,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env", env_prefix="OPSPILOT_", extra="ignore", frozen=True
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="OPSPILOT_", extra="ignore", frozen=True)
 
     environment: Literal["local", "ci", "dev", "prod-demo"] = "local"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
@@ -46,6 +44,9 @@ class Settings(BaseSettings):
     # Human approval for restricted tools.
     approval_ttl_seconds: int = Field(default=900, ge=60, le=86400)
 
+    # Sampling below 1.0 is available but off by default: a demo trace is worth more complete than
+    # it is cheap, and a sampled trace makes "where did that span go?" a debugging problem.
+    trace_sample_ratio: float = 1.0
     otel_exporter_otlp_endpoint: str | None = None
 
     @model_validator(mode="after")

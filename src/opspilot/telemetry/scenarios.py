@@ -79,9 +79,7 @@ REC_LATENCY_BAD_DEPLOY = IncidentScenario(
     title="Recommendation API latency spike after a deployment changes dependency timeouts",
     service="recommendation-service",
     window_minutes=30,
-    alert_symptom=(
-        "p95 latency for recommendation-service above 1200ms for 5 minutes (baseline 180ms)"
-    ),
+    alert_symptom=("p95 latency for recommendation-service above 1200ms for 5 minutes (baseline 180ms)"),
     injected_fault=(
         "deployment rec-2026.06.1 shortened the feature-store timeout to 400ms and raised "
         "retries to 4 without jitter, against a dependency whose p99 is 2400ms"
@@ -103,17 +101,11 @@ REC_LATENCY_BAD_DEPLOY = IncidentScenario(
         "dependency timeout newly below the dependency's p99, retried too aggressively",
     ),
     metrics=(
-        MetricProfile(
-            "request_latency_p95_ms", "ms", 180.0, 1240.0, incident_start_minute=12, noise=25.0
-        ),
+        MetricProfile("request_latency_p95_ms", "ms", 180.0, 1240.0, incident_start_minute=12, noise=25.0),
         MetricProfile("request_rate_rps", "rps", 240.0, 246.0, incident_start_minute=12, noise=6.0),
         MetricProfile("error_rate_percent", "%", 0.2, 0.9, incident_start_minute=12, noise=0.1),
-        MetricProfile(
-            "cpu_utilisation_percent", "%", 34.0, 41.0, incident_start_minute=12, noise=3.0
-        ),
-        MetricProfile(
-            "memory_utilisation_percent", "%", 58.0, 60.0, incident_start_minute=12, noise=2.0
-        ),
+        MetricProfile("cpu_utilisation_percent", "%", 34.0, 41.0, incident_start_minute=12, noise=3.0),
+        MetricProfile("memory_utilisation_percent", "%", 58.0, 60.0, incident_start_minute=12, noise=2.0),
         MetricProfile(
             "dependency_feature_store_p95_ms",
             "ms",
@@ -122,32 +114,20 @@ REC_LATENCY_BAD_DEPLOY = IncidentScenario(
             incident_start_minute=11,
             noise=60.0,
         ),
-        MetricProfile(
-            "dependency_retry_rate_rps", "rps", 3.0, 780.0, incident_start_minute=12, noise=20.0
-        ),
+        MetricProfile("dependency_retry_rate_rps", "rps", 3.0, 780.0, incident_start_minute=12, noise=20.0),
     ),
     logs=(
         ScenarioLog(11, "INFO", "deployment started", {"version": "rec-2026.06.1"}),
-        ScenarioLog(
-            12, "INFO", "deployment completed", {"version": "rec-2026.06.1", "strategy": "rolling"}
-        ),
-        ScenarioLog(
-            13, "WARN", "feature-store request exceeded 400ms timeout; retrying (attempt 1/4)"
-        ),
-        ScenarioLog(
-            14, "WARN", "feature-store request exceeded 400ms timeout; retrying (attempt 2/4)"
-        ),
-        ScenarioLog(
-            15, "WARN", "feature-store request exceeded 400ms timeout; retrying (attempt 4/4)"
-        ),
+        ScenarioLog(12, "INFO", "deployment completed", {"version": "rec-2026.06.1", "strategy": "rolling"}),
+        ScenarioLog(13, "WARN", "feature-store request exceeded 400ms timeout; retrying (attempt 1/4)"),
+        ScenarioLog(14, "WARN", "feature-store request exceeded 400ms timeout; retrying (attempt 2/4)"),
+        ScenarioLog(15, "WARN", "feature-store request exceeded 400ms timeout; retrying (attempt 4/4)"),
         ScenarioLog(
             16,
             "ERROR",
             "recommendation candidate build failed after retries; returning degraded list",
         ),
-        ScenarioLog(
-            18, "INFO", "recommendation candidate build completed in 2380ms", {"candidates": 12}
-        ),
+        ScenarioLog(18, "INFO", "recommendation candidate build completed in 2380ms", {"candidates": 12}),
         ScenarioLog(20, "INFO", "cache hit ratio 0.41", {"previous_window": 0.66}),
     ),
     deployments=(
@@ -172,9 +152,7 @@ REC_LATENCY_BAD_DEPLOY = IncidentScenario(
     restarts_last_hour=0,
 )
 
-SCENARIOS: dict[str, IncidentScenario] = {
-    REC_LATENCY_BAD_DEPLOY.scenario_id: REC_LATENCY_BAD_DEPLOY
-}
+SCENARIOS: dict[str, IncidentScenario] = {REC_LATENCY_BAD_DEPLOY.scenario_id: REC_LATENCY_BAD_DEPLOY}
 
 
 def get_scenario(scenario_id: str) -> IncidentScenario:

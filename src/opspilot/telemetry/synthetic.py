@@ -44,9 +44,7 @@ class SyntheticTelemetrySource:
         )
         points: list[MetricPoint] = []
         for minute in range(self.scenario.window_minutes):
-            value = (
-                profile.incident if minute >= profile.incident_start_minute else profile.baseline
-            )
+            value = profile.incident if minute >= profile.incident_start_minute else profile.baseline
             if profile.noise:
                 value += rng.uniform(-profile.noise, profile.noise)
             points.append(MetricPoint(at=self._minute(minute), value=round(value, 3)))

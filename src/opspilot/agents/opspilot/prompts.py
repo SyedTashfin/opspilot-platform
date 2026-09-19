@@ -70,12 +70,10 @@ def diagnosis_messages(
     runbook_chunks: list[RunbookChunk],
 ) -> tuple[Message, ...]:
     evidence_block = "\n".join(
-        f"[{item.evidence_id}] ({item.kind}, source={item.source}) {item.summary}"
-        for item in evidence
+        f"[{item.evidence_id}] ({item.kind}, source={item.source}) {item.summary}" for item in evidence
     )
     runbook_block = "\n".join(
-        f"[{chunk.citation_id}] {chunk.heading}: {chunk.text.strip()[:400]}"
-        for chunk in runbook_chunks
+        f"[{chunk.citation_id}] {chunk.heading}: {chunk.text.strip()[:400]}" for chunk in runbook_chunks
     )
     return (
         Message.system(DIAGNOSE_SYSTEM),

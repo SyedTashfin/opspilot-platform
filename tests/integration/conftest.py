@@ -45,6 +45,9 @@ async def live_engine() -> AsyncIterator[AsyncEngine]:
         pytest.skip(f"postgres unreachable: {exc}")
     try:
         async with engine.begin() as connection:
+            # Without this, a single aborted transaction left open by a failing test blocks DROP TABLE
+            # and the whole suite waits forever instead of reporting the failure.
+            await connection.execute(sa.text("SET lock_timeout = '5s'"))
             await connection.run_sync(Base.metadata.drop_all)
             await connection.run_sync(Base.metadata.create_all)
         yield engine

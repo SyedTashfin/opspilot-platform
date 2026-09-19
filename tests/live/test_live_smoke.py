@@ -53,8 +53,7 @@ async def test_one_live_call_reports_usage_and_cost() -> None:
             messages=(
                 Message.system("You are terse."),
                 Message.user(
-                    "Classify this alert as database, network or deployment: 'connection "
-                    "pool exhausted'."
+                    "Classify this alert as database, network or deployment: 'connection pool exhausted'."
                 ),
             ),
             response_model=Classification,

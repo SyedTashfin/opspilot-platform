@@ -170,9 +170,7 @@ async def test_restricted_tool_executes_with_a_matching_approval() -> None:
     )
     executor, audit = build(write_tool(), approvals=approvals)
 
-    outcome = await executor.execute(
-        "azure.restart_service", arguments, CONTEXT, approval_token="tok-1"
-    )
+    outcome = await executor.execute("azure.restart_service", arguments, CONTEXT, approval_token="tok-1")
 
     assert outcome.status is CallStatus.OK
     assert CALLS == ["api"]
@@ -186,12 +184,8 @@ async def test_approval_is_single_use() -> None:
     )
     executor, _ = build(write_tool(), approvals=approvals)
 
-    first = await executor.execute(
-        "azure.restart_service", arguments, CONTEXT, approval_token="tok-1"
-    )
-    second = await executor.execute(
-        "azure.restart_service", arguments, CONTEXT, approval_token="tok-1"
-    )
+    first = await executor.execute("azure.restart_service", arguments, CONTEXT, approval_token="tok-1")
+    second = await executor.execute("azure.restart_service", arguments, CONTEXT, approval_token="tok-1")
 
     assert first.status is CallStatus.OK
     assert second.status is CallStatus.REJECTED
@@ -208,9 +202,7 @@ async def test_approval_bound_to_other_arguments_is_refused() -> None:
     )
     executor, _ = build(write_tool(), approvals=approvals)
 
-    outcome = await executor.execute(
-        "azure.restart_service", different_args, CONTEXT, approval_token="tok-1"
-    )
+    outcome = await executor.execute("azure.restart_service", different_args, CONTEXT, approval_token="tok-1")
 
     assert outcome.status is CallStatus.REJECTED
     assert CALLS == []

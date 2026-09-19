@@ -89,9 +89,7 @@ class FakeProvider:
     name: str = "fake"
     fail_first: int = 0
     fail_always: bool = False
-    failure: ProviderError = field(
-        default_factory=lambda: ProviderError("scripted provider failure")
-    )
+    failure: ProviderError = field(default_factory=lambda: ProviderError("scripted provider failure"))
     timeout_first: int = 0
     timeout_seconds: float = 5.0
     calls: list[tuple[str, str]] = field(default_factory=list)
