@@ -18,6 +18,7 @@ Verification, all run locally on 2026-09-19 against the real stack:
 | Tests | `uv run pytest` | **228 passed, 1 deselected** (live marker), 12 of them against live PostgreSQL, in 16s |
 | Evaluation suite | `uv run python -m opspilot.evals run --provider reference` | **structural gate PASS**, 4/4 cases, 0.00 EUR, ~2s; report written to JSON |
 | Negative control | `... --provider fake` | the suite **fails**: a meaningless answer is caught by the citation grade |
+| Key preflight | `... --provider configured` | exits 3 naming `DEEPSEEK_API_KEY`; no provider key is configured on this machine |
 | Retrieval benchmark | part of the suite | hit@1 0.14, hit@3 0.71 over 7 paraphrased queries (see below) |
 | Compose | `docker compose config --quiet` | valid, including the lab service |
 | Migration (live) | `uv run alembic upgrade head` | `0003_spans` applied to PostgreSQL 16; `spans` table confirmed |

@@ -14,6 +14,8 @@ uv sync                       # creates .venv, installs runtime + dev dependenci
 cp .env.example .env          # fill in provider keys when you reach M2
 docker compose up -d postgres # PostgreSQL 16 + pgvector (the extension is available; retrieval
                               # is lexical today, see ADR-017)
+# model keys: copy .env.example to .env (gitignored) and fill in what you have. Nothing else needs one,
+# and the evaluation suite preflight tells you which variable a chosen model needs.
 
 # optional trace viewer (a viewer, never a dependency: see ADR-006)
 docker compose --profile observability up -d phoenix   # UI on http://localhost:6006

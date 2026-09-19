@@ -75,8 +75,25 @@ dependency, and a latency cost per query). The next change to retrieval must mak
 
 ## What is not measured yet
 
-- **Reasoning quality with a real model.** No provider key has been configured, so every semantic number
-  here is a placeholder. The first honest model evaluation is one command away and is not claimed.
+- **Reasoning quality with a real model.** No provider key is configured on the machine this suite was
+  developed on (checked: process environment, macOS keychain, project `.env` — all absent), so every
+  semantic number here is a placeholder and is labelled as one. Taking the measurement is two steps:
+
+  ```bash
+  printf 'MISTRAL_API_KEY=%s\n' '<your key>' >> .env   # .env is gitignored; never commit or paste a key
+  set -a; . ./.env; set +a
+  uv run python -m opspilot.evals run --provider configured --model mistral/mistral-small-latest \
+      --fail-under 0.5 --out eval-report.json
+  ```
+
+  A preflight runs first and stops with the variable name if the key is missing (exit 3), so a missing
+  credential costs seconds rather than a half-finished suite. Both `api.mistral.ai` and
+  `api.deepseek.com` were reachable from this machine at the time of writing (they answered `401`
+  unauthenticated), so no network work is pending.
+
+  Expect the reference run's 0.00 EUR to become a real number of a few cents for four investigations at
+  `mistral-small` prices; the report's `total_cost_eur` is computed from the pricing table, not estimated.
+  A previously shared Mistral key appears in an old transcript, so use a rotated one.
 - **Cost per investigation on a real model.** The reference and fake providers are free; the cost figures
   in the platform overview are therefore zero, and the dashboard says `source: measured` with a basis that
   names `model_calls`, which is accurate and currently empty.

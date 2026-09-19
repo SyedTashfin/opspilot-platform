@@ -67,15 +67,13 @@ class CaseOutcome:
     records: Sequence[StepRecord]
 
 
-def _gateway(provider: ModelProvider, ledger: InMemoryLedger) -> ModelGateway:
+def _gateway(provider: ModelProvider, ledger: InMemoryLedger, model: str) -> ModelGateway:
     return ModelGateway(
         providers=[provider],
         recorder=InMemoryRecorder(),
         ledger=ledger,
         config=GatewayConfig(
-            policy=ModelPolicy(
-                default_chain=ModelChain(step="default", models=(EVAL_MODEL,)), step_chains={}
-            ),
+            policy=ModelPolicy(default_chain=ModelChain(step="default", models=(model,)), step_chains={}),
             run_cost_cap_eur=1.0,
             daily_cost_cap_eur=10.0,
         ),
@@ -102,7 +100,7 @@ async def run_case(
     store = InMemoryRunStore()
     store.register_agent("opspilot")
     ledger = InMemoryLedger()
-    gateway = _gateway(provider, ledger)
+    gateway = _gateway(provider, ledger, config.model)
     runtime = AgentRuntime(store=store, ledger=ledger, limits=config.run_limits)
     steps = investigation_steps(
         gateway=gateway,

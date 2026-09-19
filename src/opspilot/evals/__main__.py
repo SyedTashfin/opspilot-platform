@@ -7,8 +7,9 @@ Three provider choices, and the difference between them is the whole point:
   ceiling, not a model's ability, and the output says so.
 * ``fake`` — the gateway's deterministic dummy, which answers with a citation to an id that does not
   exist. It should *fail* the citation grade; that is how the graders are shown to detect a bad answer.
-* ``configured`` — the models from settings (DeepSeek, Mistral). Without a key the run reports that the
-  measurement could not be taken rather than inventing a number.
+* ``configured`` — the models from settings (DeepSeek primary, Mistral fallback), or whichever model
+  ``--model`` names. A preflight checks that the provider's key is present and stops with the variable
+  name if it is not, so a missing credential costs seconds rather than a half-finished suite.
 """
 
 from __future__ import annotations
@@ -21,7 +22,9 @@ import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
+from opspilot.config import get_settings
 from opspilot.evals.dataset import build_dataset
+from opspilot.evals.preflight import any_ready, key_status
 from opspilot.evals.providers import ReferenceProvider
 from opspilot.evals.runner import EVAL_MODEL, SuiteConfig, run_suite
 from opspilot.evals.types import EvalCase, SuiteReport
@@ -74,7 +77,9 @@ FACTORIES: dict[str, Callable[[EvalCase], ModelProvider]] = {
 }
 
 
-def model_for(provider_label: str) -> str:
+def model_for(provider_label: str, override: str | None = None) -> str:
+    if override:
+        return override
     """The model name the chosen provider actually serves.
 
     Each provider answers only for the models it claims (``FakeProvider.supports`` refuses anything not
@@ -102,6 +107,14 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "also gate on the mean semantic score. Off by default: semantic grades come from a model, "
             "and gating on a reference provider's score would measure the harness twice"
+        ),
+    )
+    run.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "force a model, for example mistral/mistral-small-latest. The chosen provider must serve it "
+            "and its key must be configured; the preflight says which variable to set"
         ),
     )
     run.add_argument("--only", nargs="*", default=None, help="restrict to these case ids")
@@ -149,10 +162,32 @@ async def _run(args: argparse.Namespace) -> int:
         if not cases:
             print(f"no case matched {sorted(wanted)}", file=sys.stderr)
             return 2
+    model = model_for(args.provider, args.model)
+    if args.provider == "configured":
+        # Stop before spending anything: say which credential is missing instead of failing at the
+        # first model call with a provider stack trace.
+        status = key_status(model)
+        if not status.ready:
+            settings = get_settings()
+            chain = (model, settings.fallback_model)
+            print(status.describe(), file=sys.stderr)
+            if any_ready(chain):
+                print(
+                    f"a fallback in the chain is configured: try --model {settings.fallback_model}",
+                    file=sys.stderr,
+                )
+            print(
+                "place the key in the environment (or in a gitignored .env) and re-run; "
+                "never paste a key into a chat, a commit or an issue",
+                file=sys.stderr,
+            )
+            return 3
+        print(status.describe())
+
     config = SuiteConfig(
         provider_factory=FACTORIES[args.provider],
         provider_label=args.provider,
-        model=model_for(args.provider),
+        model=model,
         include_retrieval_bench=not args.skip_retrieval,
     )
     report = await run_suite(cases, config)
