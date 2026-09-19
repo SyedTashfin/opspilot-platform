@@ -41,6 +41,9 @@ class CallStatus(StrEnum):
     TIMEOUT = "timeout"
     REJECTED = "rejected"
     NOT_EXECUTED = "not_executed"
+    # Added in M3: a restricted tool was requested with no usable approval. Statuses are plain
+    # VARCHAR(32) with no CHECK, so this required no migration — the payoff of that choice.
+    WAITING_APPROVAL = "waiting_approval"
 
 
 class PermissionClass(StrEnum):

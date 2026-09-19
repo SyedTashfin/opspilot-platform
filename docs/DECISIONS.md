@@ -157,3 +157,20 @@ Status: accepted 2026-09-19. A run that exhausts every model in its chain writes
 `AllModelsFailed`. Agent steps must therefore choose: propagate, degrade, or abort — but they cannot
 silently continue on a failed grounding call.
 
+## ADR-016 — Tool governance is enforced where tools run, and refusals are data
+
+Status: accepted 2026-09-19. Implements ADR-010 concretely.
+
+1. **The definition is the authorisation.** A tool declares its permission class, risk level and
+   timeout; the executor derives behaviour from that declaration. A handler cannot widen its own
+   authority, and there is exactly one code path that invokes a tool.
+2. **Refusals are outcomes, not exceptions.** Permission denial, missing approval, invalid arguments,
+   timeout and handler failure all return a `ToolOutcome` *and* an audit row. The runtime then chooses
+   escalate / retry / abandon. Only an unregistered tool raises, because that is a wiring bug.
+3. **Approvals bind to arguments.** An approval is single-use and bound to (tool, SHA-256 of canonical
+   arguments). Approving a restart of one service cannot be replayed against another.
+4. **`ADMIN` is unreachable from an agent** — not gated behind approval, simply not callable.
+5. **The audit trail is tamper-evident**: an append-only hash chain over event content plus the
+   previous hash. The Postgres recorder reads-then-writes without serialising against concurrent
+   writers; stated here because a security claim that skips its own limits is worse than no claim.
+

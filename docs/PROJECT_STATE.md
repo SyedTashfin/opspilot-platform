@@ -1,20 +1,20 @@
 # Project state
 
-Last updated: 2026-09-19 (end of M2).
+Last updated: 2026-09-19 (end of M3).
 
 ## Current milestone
 
-**M0 (research and architecture), M1 (local skeleton) and M2 (model gateway) complete.**
+**M0 (research and architecture), M1 (local skeleton), M2 (model gateway) and M3 (tool registry,
+permissions, audit) complete.**
 
 Verification, all run locally on 2026-09-19 against the real stack:
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Formatting | `uv run ruff format --check .` | 48 files already formatted |
+| Formatting | `uv run ruff format --check .` | 58 files already formatted |
 | Lint | `uv run ruff check .` | all checks passed |
-| Types | `uv run mypy src` | no issues in 26 source files |
-| Tests | `uv run pytest` | 59 passed, including the live-PostgreSQL integration test |
-| Migration (offline) | `uv run alembic upgrade head --sql` | renders 7 tables + 5 indexes + alembic_version |
+| Types | `uv run mypy src` | no issues in 32 source files |
+| Tests | `uv run pytest` | **88 passed, 1 deselected** (live marker), integration test included |
 | Migration (live) | `uv run alembic upgrade head` | applied to PostgreSQL 16; tables confirmed with `\dt` |
 | Live model call | `uv run pytest -m live -s` | **not run** — no provider key configured yet |
 
@@ -86,13 +86,40 @@ Full rationale and rejected alternatives: `docs/DECISIONS.md`.
 - Opt-in `live` marker: one real call that prints model, tokens, measured cost and latency, skipped
   unless a provider key is present, and excluded from the default run and from CI.
 
+### M3 — tool registry, permission gate and audit trail (complete)
+
+- `opspilot.tools`: a `ToolDefinition` declares name (namespaced), description, input and output
+  schemas, permission class, risk level and its own timeout. Authorisation is derived from that
+  declaration, never from a convention in the handler.
+- `ToolRegistry` refuses duplicate names, refuses agents requesting unregistered tools (no silently
+  ignored entries), and exports both LLM-facing tool schemas and a governance snapshot for the Tools
+  page — including `requires_approval` and `agent_callable`.
+- `ToolExecutor` is the only place a tool runs, in a fixed order: resolve → validate arguments →
+  permission gate → run under timeout → validate output → audit. Invalid arguments never reach a
+  handler.
+- **Refusals are outcomes, not exceptions**: a `ToolOutcome` carrying `WAITING_APPROVAL`, `REJECTED`,
+  `TIMEOUT` or `ERROR` is returned and audited, so the runtime can escalate for approval or abandon a
+  step deliberately. Only an unregistered tool raises (a wiring bug).
+- **Approval binding**: restricted tools need a single-use approval bound to the tool *and* the
+  argument hash, so approving a restart of `api` cannot be replayed to restart `database`. `ADMIN`
+  tools are refused outright, with or without a token.
+- **Audit trail**: append-only, with a SHA-256 hash chain over event content plus the previous hash,
+  so an edited or reordered event is detectable (`InMemoryAuditRecorder.verify_chain`). Every
+  execution *and* every refusal is recorded with actor, action, subject, run id and argument hash.
+- One new status (`waiting_approval`) required **no migration** — the M1 decision to store statuses as
+  plain `VARCHAR(32)` paid off immediately.
+- Tests: 29 new (registry, executor, audit), covering the whole refusal taxonomy, single-use approval,
+  argument-bound approval, admin refusal, timeout containment, output-schema enforcement, chain
+  integrity and tamper detection — all without a network or a database.
+
 
 ## Active work
 
-M3 — tool registry: tool definitions with input/output schemas, permission classes
-(`read_only` → `admin`), risk levels, timeouts and approval requirements; a registry that refuses
-unregistered tools; an append-only audit record for every execution including refusals; and an MCP
-client so one real external server (Azure MCP or Grafana MCP) is reachable through the same registry.
+M4 — agent runtime and the OpsPilot pipeline: a persisted run state machine with deterministic safety
+limits (max steps, wall clock, cost), step records written as the run progresses so it is resumable and
+auditable, the fixed investigation pipeline (classify → metrics → logs → deployments → runbook →
+evidence → diagnosis with citations and confidence), and the first end-to-end run against the
+deterministic fake provider, with a real provider behind the same interface.
 
 ## Outstanding work (planned milestones)
 
