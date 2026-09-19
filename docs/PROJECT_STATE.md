@@ -1,32 +1,35 @@
 # Project state
 
-Last updated: 2026-09-19 (end of M3).
+Last updated: 2026-09-19 (end of M4).
 
 ## Current milestone
 
-**M0 (research and architecture), M1 (local skeleton), M2 (model gateway) and M3 (tool registry,
-permissions, audit) complete.**
+**M0 (research and architecture), M1 (local skeleton), M2 (model gateway), M3 (tool registry,
+permissions, audit) and M4 (agent runtime, OpsPilot pipeline) complete.**
 
 Verification, all run locally on 2026-09-19 against the real stack:
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Formatting | `uv run ruff format --check .` | 58 files already formatted |
-| Lint | `uv run ruff check .` | all checks passed |
-| Types | `uv run mypy src` | no issues in 32 source files |
-| Tests | `uv run pytest` | **88 passed, 1 deselected** (live marker), integration test included |
-| Migration (live) | `uv run alembic upgrade head` | applied to PostgreSQL 16; tables confirmed with `\dt` |
+| Formatting | `uv run ruff format --check src tests migrations` | 75 files already formatted |
+| Lint | `uv run ruff check src tests migrations` | all checks passed |
+| Types | `uv run mypy src` | no issues in 51 source files |
+| Tests | `uv run pytest` | **139 passed, 1 deselected** (live marker), 5 of them against live PostgreSQL |
+| Migration (live) | `uv run alembic upgrade head` | `0002_model_call_step` applied to PostgreSQL 16 |
+| Demo run | `uv run pytest tests/agents -q` | 11-step investigation on the deterministic provider, reproducible |
 | Live model call | `uv run pytest -m live -s` | **not run** — no provider key configured yet |
 
-The M1 gap is closed: the schema is applied to a real database and the integration test drives a run
-lifecycle (agent → run → model call → step) through it.
+One cosmetic `SAWarning` (a pooled connection collected by the garbage collector) still appears in the
+test summary. It is a test-harness artefact, not a leak in the application: the app disposes its engine
+in the FastAPI lifespan, and the warning does not appear when the lifespan runs.
 
 
 ## Architecture (settled)
 
 Python/FastAPI + Pydantic v2 + SQLAlchemy/Alembic API (`apps/api`), Next.js UI (`apps/web`),
 PydanticAI for typed agent/tool abstraction with our own Postgres-backed run state machine,
-LiteLLM in-process behind a `gateway` facade, pgvector over in-repo runbooks, OpenTelemetry GenAI
+LiteLLM in-process behind a `gateway` facade, runbook retrieval from a lexical index (ADR-017),
+OpenTelemetry GenAI
 spans persisted in Postgres with Phoenix as the viewer, MCP consumed via the official Python SDK,
 Postgres as the only stateful dependency, Terraform + GitHub OIDC to Azure Container Apps.
 Full rationale and rejected alternatives: `docs/DECISIONS.md`.
@@ -113,13 +116,51 @@ Full rationale and rejected alternatives: `docs/DECISIONS.md`.
   integrity and tamper detection — all without a network or a database.
 
 
+### M4 — agent runtime and the OpsPilot pipeline (complete)
+
+- `opspilot.agent` holds the runtime: `RunLimits` (steps, wall clock, cost — all mandatory), a `RunStore`
+  protocol with an in-memory double and a PostgreSQL implementation, and `AgentRuntime`, which records
+  every step before and after execution and enforces the ceilings around each one.
+- **Resumable by construction**: steps already recorded as succeeded or skipped are not re-executed, so a
+  run that suspended for approval continues where it stopped. Verified both in memory and across
+  database sessions (`tests/integration/test_run_store.py`).
+- **Failure containment**: a step that raises is recorded as failed with the exception type and ends the
+  run; the runtime never retries and never hides a failure. Hitting a budget ends the run as
+  `budget_exceeded` or `timeout` with the reason recorded.
+- `opspilot.telemetry` defines a `TelemetrySource` protocol and one implementation — a deterministic
+  synthetic source driven by a scenario. Metrics, logs, deployments and resource state are labelled
+  `source: demo` everywhere they are returned, so no artefact can be mistaken for live telemetry.
+- `opspilot.retrieval` indexes runbooks into heading-delimited chunks with a stable citation id and a
+  content hash, and retrieves with BM25 (ADR-017).
+- Five shipped runbooks with real operational content (database connectivity, dependency timeouts,
+  deployment rollback, HTTP 5xx, high CPU), each with symptoms, diagnosis steps, remediation,
+  verification and escalation.
+- `opspilot.tools` gained 4 read-only telemetry tools, 1 retrieval tool and 2 `WRITE_RESTRICTED`
+  actions, all built by factories over an injected source, so the tools do not know where data comes
+  from and M6 can swap the source without touching a step.
+- **The OpsPilot pipeline** is 11 recorded steps: classify → collect metrics → collect logs → collect
+  deployments → collect resource state → retrieve runbook → select chunks → assemble evidence →
+  diagnose → write report → propose remediation. The investigation report is written *before* any
+  action is proposed, because it is what a human reviews at the approval gate (ADR-018).
+- **Grounding is checked deterministically**: every evidence id the model cites is verified against the
+  evidence it was actually shown. Unverifiable ids are recorded as `unsupported_evidence_ids` and the
+  `grounding_ratio` is stored alongside the confidence — nothing is silently dropped and nothing is
+  silently rewritten. The pipeline test asserts exactly this, using the fake provider, whose output
+  deliberately cites a non-existent id.
+- **The approval gate is exercised end to end**: the remediation step calls a restricted tool without an
+  approval, the executor refuses, the refusal is audited, the run suspends as `waiting_approval`, and
+  the evidence log shows that nothing ran.
+- `model_calls.step` (migration `0002`) attributes each model call to the pipeline step that issued it.
+  Before this, a run's cost was a total with no attribution — the recorder carried the step name and
+  dropped it on the way to storage.
+- Tests: 51 new (runtime budgets and containment, telemetry determinism and ground-truth non-leakage,
+  retrieval ranking and citation stability, tool governance, and the pipeline end to end).
+
 ## Active work
 
-M4 — agent runtime and the OpsPilot pipeline: a persisted run state machine with deterministic safety
-limits (max steps, wall clock, cost), step records written as the run progresses so it is resumable and
-auditable, the fixed investigation pipeline (classify → metrics → logs → deployments → runbook →
-evidence → diagnosis with citations and confidence), and the first end-to-end run against the
-deterministic fake provider, with a real provider behind the same interface.
+M5 — observability: an OpenTelemetry span around every step, model call and tool execution, persisted
+to PostgreSQL and viewable in Phoenix, plus the platform metrics the dashboard reads — all labelled
+`measured`, `seeded` or `simulated` so no number is presentable without its provenance.
 
 ## Outstanding work (planned milestones)
 
@@ -150,7 +191,13 @@ deterministic fake provider, with a real provider behind the same interface.
 4. **Reliability of the local Azure CLI** on the author's Mac requires forcing IPv4 (dead IPv6 route to
    `login.microsoftonline.com`); documented in the `azure-cli-multitenant-access` skill.
 5. **Evaluation credibility** depends on the incident scenarios being genuinely unknown to the agent;
-   ground truth must never leak into prompts, tools or retrieval.
+   ground truth must never leak into prompts, tools or retrieval. M4 keeps the fault and root cause in
+   the scenario harness (`for_agent()` exposes the alert only) and a test asserts that no step detail,
+   summary or tool output contains either.
+6. **Retrieval is lexical** (ADR-017). Paraphrased symptoms may not match a runbook; this is expected to
+   be the most likely weak point and is the first thing M7 should measure.
+7. **Cost attribution is per step but not per tool call** — tool latency is recorded, tool spend is not
+   a concept (no tool in M4 costs money).
 
 ## Important commands
 

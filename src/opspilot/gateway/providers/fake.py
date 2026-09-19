@@ -17,7 +17,7 @@ import json
 from dataclasses import dataclass, field
 from enum import Enum
 from types import UnionType
-from typing import Any, Union, get_args, get_origin
+from typing import Any, Literal, Union, get_args, get_origin
 
 from pydantic import BaseModel
 
@@ -35,8 +35,18 @@ def approximate_tokens(text: str) -> int:
 
 def _scalar_for(annotation: Any, name: str, depth: int) -> Any:
     origin = get_origin(annotation)
+    if origin is Literal:
+        # A Literal is part of the schema: pick its first declared option so the generated payload
+        # validates. Without this, a Literal field makes every structured fake response invalid.
+        options = get_args(annotation)
+        return options[0] if options else None
     if origin in (Union, UnionType):
-        options = [option for option in get_args(annotation) if option is not type(None)]
+        options = get_args(annotation)
+        # An optional field resolves to None: the neutral value, and predictable for tests that
+        # assert
+        # on structured output without a model in the loop.
+        if type(None) in options:
+            return None
         return _scalar_for(options[0], name, depth) if options else None
     if origin in (list, tuple, set, frozenset):
         args = get_args(annotation)

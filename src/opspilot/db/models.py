@@ -18,6 +18,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from opspilot.db.base import Base
 from opspilot.domain.enums import (
+    UNSPECIFIED_STEP,
     AgentStatus,
     ApprovalDecision,
     CallStatus,
@@ -143,6 +144,7 @@ class ModelCall(Base):
     """One model request. The row that makes cost and latency claims checkable."""
 
     __tablename__ = "model_calls"
+    __table_args__ = (sa.Index("ix_model_calls_step", "step"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         sa.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -152,6 +154,11 @@ class ModelCall(Base):
     )
     provider: Mapped[str] = mapped_column(sa.String(40), nullable=False)
     model: Mapped[str] = mapped_column(sa.String(120), nullable=False)
+    # The pipeline step that issued the call ("classify", "diagnose", ...). Without it, a run's cost
+    # is a total with no attribution.
+    step: Mapped[str] = mapped_column(
+        sa.String(64), nullable=False, default=UNSPECIFIED_STEP, server_default=UNSPECIFIED_STEP
+    )
     request_id: Mapped[str | None] = mapped_column(sa.String(120), nullable=True)
     input_tokens: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)
     output_tokens: Mapped[int] = mapped_column(sa.Integer, nullable=False, default=0)

@@ -20,7 +20,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from opspilot.db.models import ModelCall
-from opspilot.domain.enums import CallStatus
+from opspilot.domain.enums import UNSPECIFIED_STEP, CallStatus
 from opspilot.gateway.types import ModelResponse
 
 
@@ -118,6 +118,7 @@ class PostgresRecorder:
                 run_id=call.run_id,
                 provider=call.provider,
                 model=call.model,
+                step=call.step or UNSPECIFIED_STEP,
                 request_id=call.request_id,
                 input_tokens=call.input_tokens,
                 output_tokens=call.output_tokens,

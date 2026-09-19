@@ -47,7 +47,7 @@ flowchart TB
 
   subgraph DATA["PostgreSQL (M1)"]
     PG[(domain · runs · spans · evals\naudit · cost)]
-    VEC[(pgvector: runbooks)]
+    IDX[(runbook index:\nlexical, cited chunks)]
   end
 
   subgraph OBSL["Observability (M5)"]
@@ -62,6 +62,8 @@ flowchart TB
   OPS --> FACADE
   FACADE --> LL
   REG --> AZ & GH & SQL & RAG & MCPC & ACT
+  OPS -.11 recorded steps.-> PIPE[classify → metrics → logs → deployments → resource state →
+    runbook → evidence → diagnose → report → remediation]
   AZ -.read-only.-> AZURE[(Azure Monitor / resource state)]
   GH -.read-only.-> GITHUB[(GitHub API)]
   SQL --> PG

@@ -49,6 +49,13 @@ def test_status_columns_are_varchar_without_native_enum() -> None:
     assert status_type.length == 32
 
 
+def test_model_calls_are_attributable_to_a_step() -> None:
+    model_calls = Base.metadata.tables["model_calls"]
+    assert "step" in model_calls.c
+    assert model_calls.c.step.nullable is False
+    assert model_calls.c.step.type.length == 64
+
+
 def test_money_and_tokens_are_numeric_and_integer() -> None:
     runs = Base.metadata.tables["runs"]
     assert isinstance(runs.c.cost_eur.type, sa.Numeric)

@@ -9,6 +9,9 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+#: Placeholder step name for a model call that was not issued by a named pipeline step.
+UNSPECIFIED_STEP = "unspecified"
+
 
 class AgentStatus(StrEnum):
     DRAFT = "draft"
@@ -33,6 +36,8 @@ class StepStatus(StrEnum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     SKIPPED = "skipped"
+    # Added in M4: the run suspended because a restricted tool needs a human decision.
+    WAITING_APPROVAL = "waiting_approval"
 
 
 class CallStatus(StrEnum):

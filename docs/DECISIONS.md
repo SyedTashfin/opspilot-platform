@@ -79,6 +79,11 @@ service, a backup story and a failure mode for no measurable gain at this size. 
 Chroma, Azure AI Search (the last also costs money and requires an index lifecycle for ~10 documents).
 Every retrieved chunk is returned with its source path and content hash so grounding is checkable.
 
+**Amended by ADR-017 (2026-09-19):** the storage decision stands — PostgreSQL with pgvector available,
+one stateful dependency — but retrieval *starts* lexical (BM25 over heading-delimited chunks, cited by
+chunk id and content hash) and embeddings are introduced only if the evaluation suite shows a retrieval
+gap. No vector column is created until then.
+
 ## ADR-008 — Incident Lab: application-level fault injection, ground truth withheld
 
 Status: accepted 2026-09-19.
@@ -173,4 +178,43 @@ Status: accepted 2026-09-19. Implements ADR-010 concretely.
 5. **The audit trail is tamper-evident**: an append-only hash chain over event content plus the
    previous hash. The Postgres recorder reads-then-writes without serialising against concurrent
    writers; stated here because a security claim that skips its own limits is worse than no claim.
+
+
+## ADR-017 — Retrieval starts lexical; embeddings must earn their place with measurements
+
+Status: accepted 2026-09-19.
+
+Runbooks are retrieved with BM25 over heading-delimited chunks, with a stable citation id
+(`document.md#heading`) and a content hash per chunk. Rejected for now: pgvector with embeddings
+(ADR-007 keeps the storage option open). Reasons: the corpus is small and curated, so a vector index
+is not the bottleneck; citations must be verifiable, and an id plus a hash makes a retrieved passage
+checkable; and adding a vector store before the evaluation suite can show a retrieval gap would add a
+component whose value we could not measure. Unresolved tie-break for M7: if lexical retrieval misses
+paraphrased symptoms, the evaluation suite must show it before pgvector is introduced. The question
+"does the query and the runbook use the same words?" is answerable with measurements, and that is the
+only thing that should decide this.
+
+## ADR-018 — The investigation report is written before any action is proposed
+
+Status: accepted 2026-09-19.
+
+The pipeline order is `… → diagnose → write report → propose remediation`. The report is the artefact
+a human reviews when deciding whether to approve a restricted action, so it has to exist at the
+approval gate — a run that suspends for approval must not suspend with nothing to read. The proposed
+or executed action is merged into the report at read time (`report_from_steps`) from whichever step
+recorded it, rather than being baked into a report written before the action existed. Consequence: a
+run that suspends leaves the report and the refusal both readable in the trace, and resumption is
+index-based, so the suspended step is the one that re-runs.
+
+## ADR-019 — Fixed pipeline order, runtime-owned budgets
+
+Status: accepted 2026-09-19.
+
+The control flow of an incident investigation is known and repeatable, so it is code, not a model
+decision: letting a model choose its next tool would add variance to the thing the evaluation suite
+exists to measure, and would turn "why did it do that?" into a reconstruction instead of a record.
+Budget ceilings — steps, wall clock, cost — are enforced by the runtime around every step, and hitting
+one ends the run with `budget_exceeded` or `timeout` rather than truncating silently. A step that
+raises is contained and recorded as failed; a step that needs approval suspends the run. The runtime
+never retries a step and never hides a failure.
 
