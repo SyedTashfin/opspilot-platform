@@ -15,3 +15,9 @@ htmlcov/
 .DS_Store
 node_modules/
 apps/web/.next/
+
+# Deployment credentials and logs. The database password and the lab token are generated here and must
+# never reach a commit; the log contains resource names, not secrets.
+infra/.deploy-secrets
+infra/.deploy.log
+

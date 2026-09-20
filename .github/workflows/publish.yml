@@ -1,0 +1,63 @@
+name: publish
+
+# Builds the deployable image on a native x86 runner and publishes it to GHCR.
+#
+# Why this exists rather than building on a developer machine: the laptop path failed repeatedly for
+# reasons that had nothing to do with the code. Docker buildx on macOS could not read the keychain entry
+# `docker login` wrote, so every push was refused with "failed to fetch oauth token: denied"; an Apple
+# Silicon build produces arm64 images that Container Apps will not start; Azure for Students refuses
+# ACR Tasks, so the registry cannot build either; and a sleeping laptop killed a run mid-deploy at 06:02.
+# A Linux runner is none of those things. The image is the same artefact, built somewhere it cannot fail
+# for environmental reasons.
+#
+# GHCR with the workflow's own GITHUB_TOKEN, so no long-lived registry credential exists anywhere.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["docs/**", "**.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Container registry paths must be lowercase, and this account's login is not (SyedTashfin):
+      # pushing to ghcr.io/SyedTashfin/... is rejected, so the name is normalised once here.
+      - name: normalise the image name
+        id: meta
+        run: echo "image=${IMAGE,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          # Container Apps will not start an arm64 image; the runner is x86_64, so this is native.
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:latest
+            ${{ steps.meta.outputs.image }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: report
+        run: |
+          echo "published ${{ steps.meta.outputs.image }}:latest" >> "$GITHUB_STEP_SUMMARY"
+          echo "commit ${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
