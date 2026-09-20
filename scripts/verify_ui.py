@@ -42,7 +42,8 @@ async def main() -> int:
 
         scenarios = await client.get("/api/v1/scenarios")
         print(
-            f"GET  /api/v1/scenarios       -> {scenarios.status_code}, {len(scenarios.json()['scenarios'])} scenarios"
+            f"GET  /api/v1/scenarios       -> {scenarios.status_code}, "
+            f"{len(scenarios.json()['scenarios'])} scenarios"
         )
 
         posted = await client.post("/runs", data={"scenario_id": SCENARIO, "provider": "fake"})
@@ -59,7 +60,8 @@ async def main() -> int:
         payload = await client.get(f"/api/v1/runs/{run_id}")
         body = payload.json()
         print(
-            f"GET  /api/v1/runs/{run_id[:8]} -> {payload.status_code}, status={body['run_status']}, {len(body['steps'])} steps"
+            f"GET  /api/v1/runs/{run_id[:8]} -> {payload.status_code}, "
+            f"status={body['run_status']}, {len(body['steps'])} steps"
         )
 
         trace = await client.get(f"/api/v1/runs/{run_id}/trace")
